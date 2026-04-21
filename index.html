@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuroFront</title>
+<link rel="icon" type="image/png" href="icon-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar">
+    <div class="brand-block">
+      <div>
+        <p class="eyebrow">Biosignal Monitoring Interface</p>
+        <div class="brand-assets">
+          <img class="brand-icon" src="icon-512.png" alt="NeuroFront icon">
+          <img class="brand-logo" src="NEUROFRONTLOGO.png" alt="NeuroFront">
+        </div>
+      </div>
+    </div>
+    <div class="status-pill" id="statusPill" data-state="disconnected">
+      <span class="status-dot"></span>
+      <span id="statusText">Disconnected</span>
+    </div>
+  </header>
+
+  <main class="dashboard">
+    <div class="main-column">
+      <section class="panel chart-panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Live Signal Feed</p>
+            <h2>Primary Trace</h2>
+          </div>
+          <div class="stream-meta">
+            <div class="meta-chip" id="sourceBadge">No Signal</div>
+            <div class="meta-stack">
+              <span class="meta-label">Lead State</span>
+              <strong id="leadState">Nominal</strong>
+            </div>
+          </div>
+        </div>
+        <div class="chart-stage">
+          <div class="chart-y-axis">
+            <span id="yAxisTop">20</span>
+            <span id="yAxisMid">0</span>
+            <span id="yAxisBottom">-20</span>
+          </div>
+          <div class="chart-wrap">
+            <div class="chart-overlay" id="chartOverlay">Awaiting NeuroFront signal</div>
+            <canvas id="signalChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-x-axis">
+          <span id="xAxisStart">0s</span>
+          <span id="xAxisQuarter">5s</span>
+          <span id="xAxisHalf">10s</span>
+          <span id="xAxisEnd">15s</span>
+        </div>
+      </section>
+
+      <section class="panel setup-panel">
+        <div class="panel-head compact">
+          <div>
+            <p class="eyebrow">Electrode Placement</p>
+            <h2>Setup Guide</h2>
+          </div>
+        </div>
+        <div class="setup-card">
+          <img class="setup-image" src="image.png" alt="Electrode placement guide">
+          <div class="setup-copy">
+            <p class="setup-text"><strong>Placement:</strong> Red on right, yellow on left, green on earlobe or side of neck.</p>
+            <ul class="setup-list">
+              <li>Peel each electrode off slowly so the conductive gel stays intact.</li>
+              <li>Wipe the skin first and let it dry before applying the pads.</li>
+              <li>Press each electrode down for a few seconds to improve contact.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="side-panel">
+      <section class="panel metric-panel">
+        <div class="metric-card emphasis">
+          <span class="metric-label">Signal Level</span>
+          <div class="metric-row">
+            <span class="metric-value" id="signalValue">0.0</span>
+            <span class="metric-unit">uV</span>
+          </div>
+          <p class="metric-detail" id="signalDetail">No live signal detected</p>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Temperature</span>
+          <div class="metric-row">
+            <span class="metric-value" id="tempValue">0.00</span>
+            <span class="metric-unit">&deg;C</span>
+          </div>
+          <div class="trend-pill" id="tempTrend" data-trend="stable">
+            <span class="trend-line"></span>
+            <span id="tempTrendText">Stable</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel controls-panel">
+        <div class="button-group">
+          <button id="connectButton" class="action-button primary">Connect</button>
+          <button id="measureButton" class="action-button accent" disabled>Start Measurement</button>
+          <button id="exportButton" class="action-button ghost">Export PNG</button>
+        </div>
+        <div class="countdown-card" id="countdownCard">
+          <div class="countdown-ring">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <circle class="ring-track" cx="60" cy="60" r="52"></circle>
+              <circle class="ring-progress" id="countdownRing" cx="60" cy="60" r="52"></circle>
+            </svg>
+            <div class="countdown-core">
+              <span id="countdownValue">15.0</span>
+              <small>s</small>
+            </div>
+          </div>
+          <div class="countdown-text">
+            <span class="countdown-label">Measurement Window</span>
+            <strong id="measurementState">Ready for 15 second capture</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel summary-panel" id="summaryPanel">
+        <div class="panel-head compact">
+          <div>
+            <p class="eyebrow">Session Summary</p>
+            <h2>Capture Results</h2>
+          </div>
+          <div class="activity-badge" id="activityLabel">Stable</div>
+        </div>
+        <div class="summary-grid">
+          <div class="summary-card">
+            <span class="summary-label">Average</span>
+            <strong id="avgValue">0.0</strong>
+          </div>
+          <div class="summary-card">
+            <span class="summary-label">Peak</span>
+            <strong id="peakValue">0.0</strong>
+          </div>
+          <div class="summary-card">
+            <span class="summary-label">Minimum</span>
+            <strong id="minValue">0.0</strong>
+          </div>
+        </div>
+      </section>
+    </aside>
+  </main>
+  <p class="page-disclaimer">This should not be taken as a proper medical diagnosis.</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="app.js" defer></script>
+</body>
+</html>
