@@ -389,6 +389,61 @@ h2 {
   border-color: var(--border-strong);
 }
 
+.stress-card {
+  display: grid;
+  gap: 10px;
+}
+
+.stress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stress-score {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: rgba(240, 246, 252, 0.96);
+}
+
+.stress-bar {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.stress-fill {
+  display: block;
+  width: 50%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #53d7bc 0%, #f7c75d 60%, #ff5c76 100%);
+  transition: width 220ms ease;
+}
+
+.stress-scale {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.78rem;
+  color: rgba(163, 180, 202, 0.76);
+}
+
+.stress-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(239, 245, 252, 0.96);
+}
+
+.baseline-note {
+  font-size: 0.8rem;
+  color: rgba(163, 180, 202, 0.72);
+}
+
 .metric-label,
 .summary-label,
 .countdown-label {

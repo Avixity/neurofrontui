@@ -1,8 +1,10 @@
 const SERVICE_UUID = "12345678-1234-1234-1234-1234567890ab"
 const CHAR_UUID = "abcd1234-5678-1234-5678-abcdef123456"
 const DEVICE_NAME = "NeuroFront"
+const BASELINE_MS = 20000
 const MEASUREMENT_MS = 15000
 const SAMPLE_INTERVAL = 50
+const BASELINE_SAMPLE_COUNT = Math.round(BASELINE_MS / SAMPLE_INTERVAL)
 const BUFFER_SIZE = Math.round(MEASUREMENT_MS / SAMPLE_INTERVAL)
 const SIGNAL_TIMEOUT_MS = 5000
 const RING_CIRCUMFERENCE = Math.PI * 104
@@ -20,6 +22,11 @@ const refs = {
   tempValue: document.getElementById("tempValue"),
   tempTrend: document.getElementById("tempTrend"),
   tempTrendText: document.getElementById("tempTrendText"),
+  stressScore: document.getElementById("stressScore"),
+  stressFill: document.getElementById("stressFill"),
+  stressLabel: document.getElementById("stressLabel"),
+  stressFeedback: document.getElementById("stressFeedback"),
+  baselineNote: document.getElementById("baselineNote"),
   connectButton: document.getElementById("connectButton"),
   measureButton: document.getElementById("measureButton"),
   exportButton: document.getElementById("exportButton"),
@@ -77,6 +84,20 @@ const state = {
     completed: false,
     revealed: false
   },
+  baseline: {
+    samples: [],
+    ready: false,
+    mean: 0,
+    rms: 0,
+    stdDev: 0,
+    peakToPeak: 0,
+    derivativeMean: 0
+  },
+  stress: {
+    score: 50,
+    label: "Baseline",
+    feedback: "Connect and sit relaxed for 20 seconds to calibrate your session baseline."
+  },
   summary: {
     average: 0,
     peak: 0,
@@ -117,12 +138,59 @@ function randomBetween(min, max) {
   return min + Math.random() * (max - min)
 }
 
+function computeSignalFeatures(samples) {
+  if (!samples.length) {
+    return {
+      mean: 0,
+      rms: 0,
+      stdDev: 0,
+      peakToPeak: 0,
+      derivativeMean: 0
+    }
+  }
+  let sum = 0
+  let squareSum = 0
+  let min = Infinity
+  let max = -Infinity
+  let derivativeSum = 0
+  for (let index = 0; index < samples.length; index += 1) {
+    const value = samples[index]
+    sum += value
+    squareSum += value * value
+    if (value < min) {
+      min = value
+    }
+    if (value > max) {
+      max = value
+    }
+    if (index > 0) {
+      derivativeSum += Math.abs(value - samples[index - 1])
+    }
+  }
+  const mean = sum / samples.length
+  let varianceSum = 0
+  for (const value of samples) {
+    varianceSum += (value - mean) ** 2
+  }
+  return {
+    mean,
+    rms: Math.sqrt(squareSum / samples.length),
+    stdDev: Math.sqrt(varianceSum / samples.length),
+    peakToPeak: max - min,
+    derivativeMean: samples.length > 1 ? derivativeSum / (samples.length - 1) : 0
+  }
+}
+
+function compositeActivity(features) {
+  return features.stdDev * 0.5 + features.peakToPeak * 0.35 + features.derivativeMean * 0.15
+}
+
 function isDeviceConnected() {
   return Boolean(state.device && state.device.gatt && state.device.gatt.connected)
 }
 
 function canStartMeasurement() {
-  return Boolean(state.characteristic && isDeviceConnected())
+  return Boolean(state.characteristic && isDeviceConnected() && state.baseline.ready)
 }
 
 function setStatus(status) {
@@ -153,6 +221,61 @@ function updateSourceBadge(source) {
 
 function updateLeadState() {
   refs.leadState.textContent = isDeviceConnected() ? "Nominal" : "Offline"
+}
+
+function updateStressMeter(score, label, feedback, note) {
+  const clampedScore = clamp(score, 0, 100)
+  refs.stressScore.textContent = `${Math.round(clampedScore)}/100`
+  refs.stressFill.style.width = `${clampedScore}%`
+  refs.stressLabel.textContent = label
+  refs.stressFeedback.textContent = feedback
+  refs.baselineNote.textContent = note
+}
+
+function refreshStressState(sampleWindow) {
+  if (!state.baseline.ready) {
+    const collectedSeconds = Math.min(state.baseline.samples.length / BASELINE_SAMPLE_COUNT, 1) * (BASELINE_MS / 1000)
+    const remainingSeconds = Math.max(0, BASELINE_MS / 1000 - collectedSeconds)
+    const feedback = isDeviceConnected()
+      ? `Sit relaxed while baseline calibrates. About ${remainingSeconds.toFixed(1)} seconds remaining.`
+      : "Connect and sit relaxed for 20 seconds to calibrate your session baseline."
+    state.stress.score = 50
+    state.stress.label = "Calibrating"
+    state.stress.feedback = feedback
+    updateStressMeter(50, "Calibrating", feedback, "Baseline target: 50/100")
+    return
+  }
+  if (!sampleWindow.length) {
+    state.stress.score = 50
+    state.stress.label = "Baseline Ready"
+    state.stress.feedback = "Personal baseline saved for this session."
+    updateStressMeter(50, "Baseline Ready", "Personal baseline saved for this session.", "Baseline locked until refresh or close.")
+    return
+  }
+  const current = computeSignalFeatures(sampleWindow)
+  const baselineActivity = Math.max(1, compositeActivity(state.baseline))
+  const currentActivity = compositeActivity(current)
+  const relativeDelta = (currentActivity - baselineActivity) / baselineActivity
+  const score = clamp(50 + relativeDelta * 38, 0, 100)
+  let label = "Balanced"
+  let feedback = "You appear close to your personal baseline."
+  if (score < 35) {
+    label = "Relaxed"
+    feedback = "You look relaxed relative to your session baseline."
+  } else if (score < 60) {
+    label = "Balanced"
+    feedback = "You appear close to your personal baseline."
+  } else if (score < 78) {
+    label = "Elevated"
+    feedback = "Stress appears mildly elevated. Consider a brief pause."
+  } else {
+    label = "High"
+    feedback = "Stress appears high. Slow down and take a short break."
+  }
+  state.stress.score = score
+  state.stress.label = label
+  state.stress.feedback = feedback
+  updateStressMeter(score, label, feedback, "Baseline midpoint: 50/100")
 }
 
 function updateTrendLabel() {
@@ -190,7 +313,7 @@ function resetLiveSessionState() {
 function setMeasurementIdle() {
   refs.countdownCard.classList.remove("is-running")
   refs.measureButton.disabled = !canStartMeasurement()
-  refs.measureButton.textContent = "Start Measurement"
+  refs.measureButton.textContent = state.baseline.ready ? "Start Measurement" : "Calibrating Baseline"
 }
 
 function renderSummary() {
@@ -205,6 +328,18 @@ function renderSummary() {
   if (state.summary.activityLabel === "High Activity") {
     refs.activityLabel.classList.add("high")
   }
+}
+
+function captureBaselineSample(value) {
+  if (state.baseline.ready || state.measurement.active) {
+    return
+  }
+  state.baseline.samples.push(value)
+  if (state.baseline.samples.length < BASELINE_SAMPLE_COUNT) {
+    return
+  }
+  state.baseline.samples = state.baseline.samples.slice(0, BASELINE_SAMPLE_COUNT)
+  Object.assign(state.baseline, computeSignalFeatures(state.baseline.samples), { ready: true })
 }
 
 function initChart() {
@@ -349,6 +484,7 @@ function finalizeMeasurement() {
   state.summary.activityLabel = activityLabel
   renderSummary()
   refs.summaryPanel.classList.add("visible")
+  refreshStressState(samples)
   resetLiveSessionState()
 }
 
@@ -369,6 +505,7 @@ function startMeasurement() {
   state.temperature = IDLE_TEMPERATURE
   state.displayTemperature = IDLE_TEMPERATURE
   state.temperatureTrend = "stable"
+  refreshStressState([])
   refs.measurementState.textContent = "Recording in progress"
   refs.measureButton.disabled = true
   refs.measureButton.textContent = "Recording"
@@ -492,6 +629,9 @@ function updateChartState(now) {
 
 function updateControlsAvailability(now) {
   refs.measureButton.disabled = state.measurement.active || !canStartMeasurement()
+  if (!state.measurement.active) {
+    refs.measureButton.textContent = state.baseline.ready ? "Start Measurement" : "Calibrating Baseline"
+  }
 }
 
 function updateChart() {
@@ -538,6 +678,7 @@ function animationLoop(now) {
   updateSourceBadge(state.source)
   updateLeadState()
   updateReadouts()
+  refreshStressState(state.measurement.active ? state.measurement.samples : state.measurement.completed ? state.exportSnapshot.buffer : [])
   updateChartState(now)
   updateControlsAvailability(now)
   updateMeasurement(now)
@@ -680,6 +821,7 @@ function handleDisconnect() {
     refs.summaryPanel.classList.remove("visible")
   }
   resetLiveSessionState()
+  refreshStressState([])
   setMeasurementIdle()
   setStatus("disconnected")
 }
@@ -692,6 +834,7 @@ function handleCharacteristic(event) {
   state.lastIncomingTime = performance.now()
   if (Number.isFinite(parsedValue)) {
     state.bluetoothValue = parsedValue
+    captureBaselineSample(parsedValue)
   }
   state.leadOff = false
   setStatus("connected")
@@ -770,6 +913,7 @@ function init() {
   bindEvents()
   setStatus("disconnected")
   renderSummary()
+  refreshStressState([])
   updateChartState(performance.now())
   updateControlsAvailability(performance.now())
   requestAnimationFrame(() => {
