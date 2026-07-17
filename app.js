@@ -22,6 +22,8 @@ const refs = {
   tempValue: document.getElementById("tempValue"),
   tempTrend: document.getElementById("tempTrend"),
   tempTrendText: document.getElementById("tempTrendText"),
+  gsrValue: document.getElementById("gsrValue"),
+  gsrDetail: document.getElementById("gsrDetail"),
   stressScore: document.getElementById("stressScore"),
   stressFill: document.getElementById("stressFill"),
   stressLabel: document.getElementById("stressLabel"),
@@ -64,6 +66,9 @@ const state = {
   signalDelta: 0,
   temperature: DISCONNECTED_TEMPERATURE,
   displayTemperature: DISCONNECTED_TEMPERATURE,
+  gsr: 0,
+  displayGsr: 0,
+  gsrBaseline: 0,
   noiseCurrent: 0,
   noiseTarget: 0,
   noiseShiftAt: 0,
@@ -304,9 +309,13 @@ function resetLiveSessionState() {
   state.axisMax = 20
   state.temperature = DISCONNECTED_TEMPERATURE
   state.displayTemperature = DISCONNECTED_TEMPERATURE
+  state.gsr = 0
+  state.displayGsr = 0
   state.temperatureTrend = "stable"
   refs.signalValue.textContent = IDLE_BASELINE.toFixed(1)
   refs.tempValue.textContent = DISCONNECTED_TEMPERATURE.toFixed(2)
+  refs.gsrValue.textContent = "0.0"
+  refs.gsrDetail.textContent = "No signal detected"
   refs.signalDetail.textContent = "No live signal detected"
 }
 
@@ -441,6 +450,7 @@ function relaxIdleState(now) {
   state.noiseCurrent = 0
   state.noiseTarget = 0
   state.temperature = lerp(state.temperature, DISCONNECTED_TEMPERATURE, 0.16)
+  state.gsr = lerp(state.gsr, 0, 0.16)
   state.temperatureTrend = "stable"
 }
 
@@ -504,6 +514,8 @@ function startMeasurement() {
   state.measurement.samples = []
   state.temperature = IDLE_TEMPERATURE
   state.displayTemperature = IDLE_TEMPERATURE
+  state.gsrBaseline = randomBetween(2.5, 3.5)
+  state.gsr = state.gsrBaseline
   state.temperatureTrend = "stable"
   refreshStressState([])
   refs.measurementState.textContent = "Recording in progress"
@@ -562,14 +574,43 @@ function pushSignalSample(value) {
   } else {
     state.temperatureTrend = "stable"
   }
+  
+  // GSR (Galvanic Skin Response) calculation based on stress/activity
+  // Maps to realistic ranges: Relaxed (1.5-3.0) → Calm (3.0-5.5) → Focused (5.5-8.0) → Stressed (8.0-18.0)
+  const gsrActivityInfluence = state.activity * 3.2
+  const gsrRandomNoise = randomBetween(-0.15, 0.15)
+  const gsrTarget = clamp(state.gsrBaseline + gsrActivityInfluence + gsrRandomNoise, 1.2, 18.0)
+  state.gsr = lerp(state.gsr, gsrTarget, 0.04)
 }
 
 function updateReadouts() {
   state.displaySignal = lerp(state.displaySignal, state.liveValue, 0.16)
   state.displayTemperature = lerp(state.displayTemperature, state.temperature, 0.12)
+  state.displayGsr = lerp(state.displayGsr, state.gsr, 0.12)
   refs.signalValue.textContent = state.displaySignal.toFixed(1)
   refs.tempValue.textContent = state.displayTemperature.toFixed(2)
+  refs.gsrValue.textContent = state.displayGsr.toFixed(1)
   refs.signalDetail.textContent = state.source === "bluetooth" ? "Live signal from NeuroFront" : "No live signal detected"
+  
+  // GSR classification
+  if (state.status === "connected" && !state.measurement.active) {
+    refs.gsrDetail.textContent = "Ready for baseline calibration"
+  } else if (state.measurement.active) {
+    if (state.displayGsr < 3.5) {
+      refs.gsrDetail.textContent = "Deep relaxation detected"
+    } else if (state.displayGsr < 5.5) {
+      refs.gsrDetail.textContent = "Calm state"
+    } else if (state.displayGsr < 8.0) {
+      refs.gsrDetail.textContent = "Focused state"
+    } else if (state.displayGsr < 12.0) {
+      refs.gsrDetail.textContent = "Mild stress"
+    } else {
+      refs.gsrDetail.textContent = "High stress detected"
+    }
+  } else {
+    refs.gsrDetail.textContent = "No signal detected"
+  }
+  
   updateTrendLabel()
 }
 
