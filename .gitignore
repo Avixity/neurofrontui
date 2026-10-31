@@ -1,9 +1,0 @@
-node_modules/
-dist/
-.work/
-.vercel/
-.env*
-!.env.example
-test-results/
-playwright-report/
-*.log
