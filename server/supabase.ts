@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
-import type { ServerConfig } from "./config";
-import { HttpError } from "./http";
+import type { ServerConfig } from "./config.js";
+import { HttpError } from "./http.js";
 
 const boundedFetch: typeof fetch = (input, init) =>
   fetch(input, {

@@ -56,11 +56,14 @@ Only in that query mode, browser QA can use `window.__neurofrontSimulation` to s
 
 ```sh
 npm run check:i18n
+npm run check:server
 npm test
 npm run build
 ```
 
 Tests cover acquisition timing and interruptions, packet parsing, score parity, preserved baseline data, chart geometry/decimation, language completeness/lazy loading, signed assistant request boundaries, token binding, deletion barriers, and PostgreSQL ownership/transaction/quota behavior. Database tests execute the actual migration in PGlite with test `auth.users`/`auth.uid()` stubs. They are not live Supabase Auth, SMTP, OAuth or AI-provider tests. Browser simulator checks are separate from hardware testing.
+
+The build also transpiles the server import graph and loads every API entrypoint in plain Node. This checks deployed ESM resolution and the unconfigured status, assistant and account response paths without contacting a provider.
 
 `npm run preview` serves the built frontend at **http://localhost:4180**. To exercise API routes there, also run `node --import tsx server/dev.ts` with `APP_ORIGIN=http://localhost:4180`; the preview proxies `/api` to port 5181. Restart the API after changing server source or environment values because the development API process does not hot-reload.
 

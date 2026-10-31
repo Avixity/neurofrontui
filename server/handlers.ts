@@ -1,17 +1,17 @@
 import { streamText } from "ai";
-import type { Measurement } from "../src/types";
+import type { Measurement } from "../src/types.js";
 import {
   assistantConfigured,
   cloudConfigured,
   readConfig,
   type ServerConfig,
-} from "./config";
+} from "./config.js";
 import {
   assistantSchema,
   contextSchema,
   type AssistantContext,
   type AssistantInput,
-} from "./contracts";
+} from "./contracts.js";
 import {
   errorResponse,
   HttpError,
@@ -19,14 +19,14 @@ import {
   readJson,
   requireMethod,
   requireSameOrigin,
-} from "./http";
+} from "./http.js";
 import {
   issueGuestTicket,
   subjectHash,
   validateGuestRequest,
-} from "./security";
-import { serviceClient, verifiedAccount } from "./supabase";
-import { projectKnowledge } from "./knowledge";
+} from "./security.js";
+import { serviceClient, verifiedAccount } from "./supabase.js";
+import { projectKnowledge } from "./knowledge.js";
 
 function requireAssistant(config: ServerConfig) {
   if (!assistantConfigured(config))

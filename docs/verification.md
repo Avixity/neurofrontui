@@ -10,6 +10,7 @@ Verified locally on 1 November 2026. The final application root is `NeuroFront -
 - The dependency audit reported zero vulnerabilities during implementation.
 - Backend checks include ownership/RLS and invalid baseline relationships in PGlite, save retry IDs, captured-auth identity isolation, account clearing, guest transfer consent, rate limits, bounded assistant context and failure paths. These are local automated checks, not a live Supabase deployment test.
 - Local frontend, logo and API status requests returned HTTP 200. The unconfigured status correctly reports cloud and assistant services as unavailable. Assistant requests return a clear 503, foreign-origin requests are rejected, and account deletion without authentication returns 401.
+- The first production smoke check caught extensionless server ESM imports that worked under the local TypeScript runner but failed in plain Node. Explicit `.js` import paths resolve that issue. All four transpiled API entrypoints now import in plain Node, with status 200, unavailable assistant routes 503 and unauthenticated account access 401. The 15 targeted auth/security/assistant tests also passed after this correction. `npm run check:server` repeats the compiled-runtime check and is included in the production build.
 
 ## Browser checks
 

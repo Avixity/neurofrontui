@@ -1,8 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { Readable } from "node:stream";
 import { once } from "node:events";
-import { route } from "./handlers";
-import { errorResponse } from "./http";
+import { route } from "./handlers.js";
+import { errorResponse } from "./http.js";
 
 export async function nodeHandler(
   incoming: IncomingMessage & { body?: unknown },

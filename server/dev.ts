@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { createServer } from "node:http";
-import { nodeHandler } from "./node";
+import { nodeHandler } from "./node.js";
 
 for (const path of [".env.local", ".env"]) {
   if (existsSync(path)) process.loadEnvFile(path);

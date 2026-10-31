@@ -1,5 +1,5 @@
-import { en } from "../src/content/en";
-import { ARTICLE_IDS } from "../src/content/types";
+import { en } from "../src/content/en.js";
+import { ARTICLE_IDS } from "../src/content/types.js";
 
 const navigation = [
   "Overview shows device state, the active baseline, recent sessions and a shortcut to start a measurement.",

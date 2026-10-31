@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && npm run check:server && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4180",
     "test": "vitest run",
     "test:watch": "vitest",
     "check:i18n": "tsx scripts/check-i18n.ts",
+    "check:server": "node scripts/check-server.mjs",
     "test:browser": "node scripts/test-browser.mjs",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"server/**/*.ts\" \"api/**/*.ts\" \"tests/**/*.{ts,tsx}\""
   },

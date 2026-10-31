@@ -1,1 +1,1 @@
-export { nodeHandler as default } from "../server/node";
+export { nodeHandler as default } from "../server/node.js";
