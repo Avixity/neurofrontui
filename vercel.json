@@ -9,6 +9,7 @@
     { "src": "account-language.js", "use": "@vercel/static" },
     { "src": "supabase-2.118.0.js", "use": "@vercel/static" },
     { "src": "index.html", "use": "@vercel/static" },
+    { "src": "email-preview.html", "use": "@vercel/static" },
     { "src": "styles.css", "use": "@vercel/static" },
     { "src": "app.js", "use": "@vercel/static" },
     { "src": "language.js", "use": "@vercel/static" },
