@@ -5,6 +5,7 @@ const fs = require("node:fs")
 const path = require("node:path")
 const vm = require("node:vm")
 const scores = require("./score-config.js")
+const accounts = require("./accounts-server.cjs")
 
 const LANGUAGES = ["en", "hi", "mr", "bn", "ta", "te", "kn", "ml", "gu", "pa", "or", "as", "ur"]
 const MAX_BODY = 32768
@@ -101,8 +102,9 @@ function buildFacts(input, comparison) {
   return facts
 }
 
-function validateRequest(body) {
-  keys(body, ["language", "messages", "context"])
+function validateRequest(body, authenticated = false) {
+  keys(body, authenticated ? ["language", "messages", "context", "accountCaptureId"] : ["language", "messages", "context"])
+  if (authenticated && (body.context !== null || (body.accountCaptureId !== null && !safeId(body.accountCaptureId)))) fail()
   if (!LANGUAGES.includes(body.language) || !Array.isArray(body.messages) || body.messages.length < 1 || body.messages.length > 8) fail()
   const messages = body.messages.map(validateMessage)
   if (messages.at(-1).role !== "user") fail()
@@ -117,7 +119,7 @@ function validateRequest(body) {
     }
     if (new Set(context.previous.map(record => record.id)).size !== context.previous.length) fail()
   }
-  return { language: body.language, messages, context }
+  return { language: body.language, messages, context, ...(authenticated ? { accountCaptureId: body.accountCaptureId } : {}) }
 }
 
 async function readBody(request) {
@@ -139,7 +141,6 @@ async function readBody(request) {
 }
 
 function verifyOrigin(request, production) {
-  if (request.headers.authorization) fail("invalid_request", 400)
   if (!/^application\/json(?:\s*;|$)/i.test(request.headers["content-type"] || "")) fail("invalid_request", 415)
   const origin = request.headers.origin
   try {
@@ -325,7 +326,8 @@ function createHandler(options = {}) {
     try {
       if (request.method !== "POST") { response.setHeader("Allow", "POST"); fail("invalid_request", 405) }
       verifyOrigin(request, production)
-      const input = validateRequest(await readBody(request))
+      const authorization = request.headers.authorization
+      const input = validateRequest(await readBody(request), Boolean(authorization))
       if (!env.GROQ_API_KEY) fail("not_configured", 503)
       await rateLimit(request)
       if (controller.signal.aborted) fail("unavailable", 503)
@@ -333,6 +335,13 @@ function createHandler(options = {}) {
       concurrent++; acquired = true
       deadline = setTimeout(() => controller.abort(), options.deadlineMs || DEADLINE_MS)
       const work = async () => {
+        if (authorization) {
+          const user = await accounts.verifyUser(authorization, env, fetcher, controller.signal)
+          if (input.accountCaptureId) {
+            const context = await accounts.accountContext(user, input.accountCaptureId, fetcher, controller.signal)
+            input.context = validateRequest({ language: input.language, messages: input.messages, context }).context
+          }
+        }
         const model = env.GROQ_MODEL || DEFAULT_MODEL
         const reviewModel = env.GROQ_REVIEW_MODEL || DEFAULT_REVIEW_MODEL
         if (![model, reviewModel].every(value => typeof value === "string" && /^[a-zA-Z0-9._/-]{1,120}$/.test(value))) fail("not_configured", 503)
@@ -364,7 +373,7 @@ function createHandler(options = {}) {
       const result = await Promise.race([work(), aborted])
       if (!clientClosed && !response.writableEnded && !response.destroyed) send(response, 200, result)
     } catch (error) {
-      const known = error instanceof AssistantError
+      const known = error instanceof AssistantError || error instanceof accounts.AccountError
       if (!clientClosed && !response.writableEnded && !response.destroyed) send(response, known ? error.status : 503, { error: { code: known ? error.code : "unavailable" } })
     } finally {
       clearTimeout(deadline)

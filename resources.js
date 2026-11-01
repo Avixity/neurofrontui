@@ -21,7 +21,10 @@
     toggle.setAttribute("aria-expanded", String(expanded))
     content.hidden = !expanded
     if (persist) {
-      try { localStorage.setItem(preferenceKey, String(expanded)) } catch (_) { /* The current view remains usable without storage. */ }
+      if (!window.NeuroFrontAccount?.owner()) {
+        try { localStorage.setItem(preferenceKey, String(expanded)) } catch (_) { /* The current view remains usable without storage. */ }
+      }
+      document.dispatchEvent(new CustomEvent("neurofront:resourcespreference", { detail: { expanded } }))
     }
   }
 
@@ -126,7 +129,7 @@
   let initiallyExpanded = false
   try { initiallyExpanded = localStorage.getItem(preferenceKey) === "true" } catch (_) { /* Start collapsed when storage is unavailable. */ }
   setExpanded(initiallyExpanded, false)
-  window.NeuroFrontResources = Object.freeze({ open: openArticle })
+  window.NeuroFrontResources = Object.freeze({ open: openArticle, setExpanded })
   document.addEventListener("neurofront:languagechange", refreshLanguage)
   refreshLanguage()
 })()

@@ -20,6 +20,10 @@
   let selected = null
   let latestCapture = null
   let returnFocus = null
+  let accountOwner = null
+  let scopeVersion = 0
+  let visibleCount = PAGE_SIZE
+  const guestPending = new Map()
 
   const dictionary = () => window.NEUROFRONT_TRANSLATIONS[document.documentElement.lang] || window.NEUROFRONT_TRANSLATIONS.en
   const t = (key, values = {}) => (dictionary()[key] || window.NEUROFRONT_TRANSLATIONS.en[key] || key)
@@ -114,6 +118,23 @@
   }
 
   async function loadPage(reset = false) {
+    if (accountOwner) {
+      if (reset) visibleCount = Math.max(PAGE_SIZE, visibleCount)
+      else visibleCount += PAGE_SIZE
+      const account = window.NeuroFrontAccount.getState()
+      records.clear(); pending.clear(); savedIds.clear()
+      const captures = sorted(account.captures.filter(validCapture))
+      for (const record of captures.slice(0, visibleCount)) {
+        records.set(record.id, record)
+        if (record.cloudSaved) savedIds.add(record.id)
+        else pending.set(record.id, record)
+      }
+      hasMore = captures.length > visibleCount
+      readFailed = Boolean(account.error && !captures.length)
+      renderList()
+      return
+    }
+    const version = scopeVersion
     if (loading) {
       await loading
       if (!reset) return
@@ -121,15 +142,17 @@
     loading = (async () => {
       try {
         const result = await readPage(reset ? null : cursor)
+        if (version !== scopeVersion) return
         if (reset) records.clear()
         for (const record of result.page) { records.set(record.id, record); savedIds.add(record.id) }
         cursor = result.nextCursor
         hasMore = result.more
         readFailed = result.invalid
-      } catch { readFailed = true }
+      } catch { if (version === scopeVersion) readFailed = true }
     })()
     renderList()
     await loading
+    if (version !== scopeVersion) return
     loading = null
     renderList()
   }
@@ -157,7 +180,7 @@
       content.append(date, meta)
       if (pending.has(record.id)) {
         const status = document.createElement("small")
-        status.textContent = t(saving.has(record.id) ? "history.saving" : "history.notSaved")
+        status.textContent = t(accountOwner ? "account.sync.pending" : saving.has(record.id) ? "history.saving" : "history.notSaved")
         content.append(status)
       }
       const button = document.createElement("button")
@@ -179,7 +202,8 @@
     const failedSaves = pending.size > saving.size
     elements.historyRetry.hidden = !failedSaves && !readFailed
     elements.historyRetry.disabled = Boolean(saving.size || loading)
-    const status = failedSaves ? "history.saveFailed" : readFailed ? "history.loadFailed" : saving.size ? "history.saving" : loading ? "history.loading" : ""
+    const account = accountOwner ? window.NeuroFrontAccount?.getState() : null
+    const status = account ? account.conflict ? "account.error.conflict" : account.error ? "account.sync.error" : account.pending ? "account.sync.pending" : "" : failedSaves ? "history.saveFailed" : readFailed ? "history.loadFailed" : saving.size ? "history.saving" : loading ? "history.loading" : ""
     elements.historyStatus.textContent = status ? t(status) : ""
     if (focusedId && !elements.captureDialog.open) {
       [...elements.historyList.querySelectorAll("button")].find(button => button.dataset.captureId === focusedId)?.focus({ preventScroll: true })
@@ -187,18 +211,21 @@
   }
 
   async function persist(record) {
+    const version = scopeVersion
     if (saving.has(record.id)) return saving.get(record.id)
     const work = (async () => {
       try {
         await storeCapture(record)
+        guestPending.delete(record.id)
+        if (version !== scopeVersion) return
         savedIds.add(record.id)
         pending.delete(record.id)
         records.set(record.id, record)
       } catch {
-        pending.set(record.id, record)
+        guestPending.set(record.id, record)
+        if (version === scopeVersion) pending.set(record.id, record)
       } finally {
-        saving.delete(record.id)
-        renderList()
+        if (version === scopeVersion) { saving.delete(record.id); renderList() }
       }
     })()
     saving.set(record.id, work)
@@ -211,7 +238,16 @@
     const record = copy(snapshot)
     latestCapture = record
     document.dispatchEvent(new CustomEvent("neurofront:capture-completed", { detail: { id: record.id } }))
+    if (accountOwner) {
+      const id = accountOwner, version = scopeVersion
+      records.set(record.id, record); pending.set(record.id, record); renderList()
+      window.NeuroFrontAccount.saveCapture(record, id).catch(() => {
+        if (version === scopeVersion) { pending.set(record.id, record); renderList() }
+      })
+      return
+    }
     pending.set(record.id, record)
+    guestPending.set(record.id, record)
     persist(record).then(() => { if (savedIds.has(record.id)) loadPage(true) })
   }
 
@@ -319,6 +355,7 @@
 
   elements.historyLoadMore.addEventListener("click", () => loadPage())
   elements.historyRetry.addEventListener("click", async () => {
+    if (accountOwner) { await window.NeuroFrontAccount.retry().catch(() => {}); await loadPage(true); return }
     await Promise.all([...pending.values()].map(persist))
     await loadPage(true)
   })
@@ -345,6 +382,10 @@
   })
   document.addEventListener("neurofront:languagechange", () => { renderList(); renderCapture() })
   async function readAssistantHistory(capture) {
+    if (accountOwner) {
+      const account = window.NeuroFrontAccount.getState()
+      return { previous: copy(sorted(account.captures.filter(record => validCapture(record) && record.id !== capture.id && record.completedAt < capture.completedAt)).slice(0, 120)), historyAvailable: !account.error || account.captures.length > 0 }
+    }
     try {
       const db = await openDatabase()
       const previous = await new Promise((resolve, reject) => {
@@ -373,6 +414,34 @@
     elements.captureDialog.close()
     window.NeuroFrontAssistant?.explain(record)
   })
-  window.NeuroFrontHistory = Object.freeze({ record: recordCapture, getLatest: () => latestCapture && copy(latestCapture), readAssistantHistory })
+  async function readGuestCaptures() {
+    const db = await openDatabase()
+    const saved = await new Promise((resolve, reject) => {
+      const request = db.transaction(STORE).objectStore(STORE).getAll()
+      request.onsuccess = () => resolve(request.result.filter(validCapture))
+      request.onerror = () => reject(request.error)
+    })
+    const all = new Map(saved.map(record => [record.id, record]))
+    for (const [id, record] of guestPending) all.set(id, record)
+    return copy(sorted([...all.values()]))
+  }
+  document.addEventListener("neurofront:accountreset", event => {
+    scopeVersion++
+    accountOwner = event.detail.nextOwner
+    if (elements.captureDialog.open) elements.captureDialog.close()
+    records.clear(); pending.clear(); saving.clear(); savedIds.clear()
+    latestCapture = null; selected = null; cursor = null; hasMore = false; readFailed = false; loading = null; visibleCount = PAGE_SIZE
+    if (!accountOwner) for (const [id, record] of guestPending) pending.set(id, record)
+    renderList()
+  })
+  document.addEventListener("neurofront:accountrecords", event => {
+    if (event.detail.owner === accountOwner) loadPage(true)
+  })
+  document.addEventListener("neurofront:accountchange", () => {
+    const label = document.querySelector('[data-i18n="history.local"]')
+    if (label) window.NeuroFrontI18n.setMessage(label, accountOwner ? "account.history.cloud" : "history.local")
+    if (accountOwner) renderList()
+  })
+  window.NeuroFrontHistory = Object.freeze({ record: recordCapture, getLatest: () => latestCapture && copy(latestCapture), readAssistantHistory, validCapture, readGuestCaptures })
   loadPage(true)
 })()

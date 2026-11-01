@@ -3,6 +3,11 @@
   "version": 2,
   "builds": [
     { "src": "assistant-api.js", "use": "@vercel/node", "config": { "includeFiles": ["resource-data.js"] } },
+    { "src": "account-config-api.js", "use": "@vercel/node" },
+    { "src": "account-store.js", "use": "@vercel/static" },
+    { "src": "account-ui.js", "use": "@vercel/static" },
+    { "src": "account-language.js", "use": "@vercel/static" },
+    { "src": "supabase-2.118.0.js", "use": "@vercel/static" },
     { "src": "index.html", "use": "@vercel/static" },
     { "src": "styles.css", "use": "@vercel/static" },
     { "src": "app.js", "use": "@vercel/static" },
@@ -23,6 +28,8 @@
   ],
   "routes": [
     { "src": "/api/assistant", "dest": "/assistant-api.js" },
+    { "src": "/api/account-config", "dest": "/account-config-api.js" },
+    { "src": "/account-config-api(?:\\.js)?", "status": 404 },
     { "src": "/assistant-api(?:\\.js)?", "status": 404 },
     { "src": "/", "dest": "/index.html" },
     { "handle": "filesystem" },

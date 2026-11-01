@@ -1,0 +1,2 @@
+# Preserve the exact upstream SDK bytes, including whitespace inside template strings.
+supabase-2.118.0.js binary

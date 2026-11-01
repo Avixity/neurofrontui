@@ -100,12 +100,15 @@
     menu.append(option)
   }
 
-  function selectLanguage(code) {
+  function selectLanguage(code, persist = true) {
     if (!dictionaries[code]) return
+    if (locale === code) { if (persist) closeMenu(true); return }
     locale = code
-    try { localStorage.setItem(storageKey, locale) } catch {}
+    if (persist && !window.NeuroFrontAccount?.owner()) {
+      try { localStorage.setItem(storageKey, locale) } catch {}
+    }
     applyLanguage()
-    closeMenu(true)
+    closeMenu(persist)
   }
 
   function openMenu() {
@@ -168,7 +171,7 @@
   if ("ResizeObserver" in window) new ResizeObserver(sizeButton).observe(statusPill)
   else window.addEventListener("resize", sizeButton)
 
-  window.NeuroFrontI18n = { setText, setMessage }
+  window.NeuroFrontI18n = { setText, setMessage, select: selectLanguage }
   applyLanguage()
   sizeButton()
 })()

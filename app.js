@@ -401,10 +401,25 @@ function setBaselineTimer(seconds, progress, label, status) {
   window.NeuroFrontI18n.setText(refs.measurementState, status)
 }
 
+let baselineSaveNotice = null
+
+function updateAccountBaselineNotice() {
+  const notice = baselineSaveNotice
+  if (!notice?.queued || state.flow !== "ready" || state.calibration.active || state.measurement.active || state.baseline.createdAt !== notice.createdAt) return
+  const account = window.NeuroFrontAccount?.getState()
+  if (account?.user?.id !== notice.owner) return
+  const key = notice.failed || account.error || account.conflict ? "account.sync.error" : account.status === "saved" ? "account.saved" : "account.sync.pending"
+  window.NeuroFrontI18n.setMessage(refs.baselineActionStatus, key)
+  window.NeuroFrontI18n.setMessage(refs.measurementState, key)
+  if (key === "account.saved") baselineSaveNotice = null
+}
+
 function startCalibration() {
   if (!state.characteristic || !isDeviceConnected() || state.measurement.active || state.calibration.active) return
+  baselineSaveNotice = null
   state.calibration = { active: true, startTime: performance.now(), samples: [], holdTimer: false }
   state.flow = "calibrating"
+  window.NeuroFrontAccount?.deviceBusy()
   refs.countdownCard.classList.add("is-running")
   window.NeuroFrontI18n.setText(refs.baselineActionStatus, "Calibrating your baseline")
   setBaselineTimer(BASELINE_MS / 1000, 0, "Calibration Window", "Calibrating your baseline")
@@ -417,6 +432,7 @@ function cancelCalibration(message = "Calibration cancelled. Your previous basel
   state.calibration.samples = []
   state.calibration.holdTimer = true
   state.flow = "baseline"
+  window.NeuroFrontAccount?.deviceBusy()
   refs.countdownCard.classList.remove("is-running")
   window.NeuroFrontI18n.setText(refs.baselineActionStatus, message)
   setBaselineTimer(MEASUREMENT_MS / 1000, 0, "Measurement Window", "Ready for 15 second capture")
@@ -427,6 +443,7 @@ function useSavedBaseline() {
   if (!state.savedBaseline || !isDeviceConnected() || state.measurement.active || state.calibration.active) return
   const record = state.savedBaseline
   if (!validateSavedBaseline(record)) return
+  baselineSaveNotice = null
   state.baseline = { ...record.features, samples: record.samples.slice(), ready: true, createdAt: record.createdAt }
   state.flow = "ready"
   state.calibration.holdTimer = true
@@ -465,12 +482,25 @@ function updateCalibration(now) {
   state.calibration.holdTimer = true
   refs.countdownCard.classList.remove("is-running")
   let message = "Calibration complete. Baseline saved in this browser."
-  try {
-    localStorage.setItem(BASELINE_STORAGE_KEY, JSON.stringify(record))
+  if (window.NeuroFrontAccount?.owner()) {
     state.savedBaseline = record
-  } catch {
-    message = "Baseline ready, but this browser could not save it."
+    message = "Baseline ready. Account save pending."
+    const notice = { owner: window.NeuroFrontAccount.owner(), createdAt, queued: false }
+    baselineSaveNotice = notice
+    window.NeuroFrontAccount.saveBaseline(record).then(() => {
+      if (baselineSaveNotice === notice) { notice.queued = true; updateAccountBaselineNotice() }
+    }).catch(() => {
+      if (baselineSaveNotice === notice) { notice.queued = true; notice.failed = true; updateAccountBaselineNotice() }
+    })
+  } else {
+    try {
+      localStorage.setItem(BASELINE_STORAGE_KEY, JSON.stringify(record))
+      state.savedBaseline = record
+    } catch {
+      message = "Baseline ready, but this browser could not save it."
+    }
   }
+  window.NeuroFrontAccount?.deviceBusy()
   window.NeuroFrontI18n.setText(refs.baselineActionStatus, message)
   setBaselineTimer(0, 1, "Calibration Window", message)
   updateSavedBaselineInfo()
@@ -590,6 +620,7 @@ function recordMeasurementSample(value) {
 function finalizeMeasurement() {
   if (!state.measurement.active) return
   state.measurement.active = false
+  window.NeuroFrontAccount?.deviceBusy()
   state.measurement.completed = true
   state.measurement.revealed = true
   setMeasurementIdle()
@@ -656,6 +687,7 @@ function finalizeMeasurement() {
 }
 
 function measureAgain() {
+  baselineSaveNotice = null
   if (state.flow !== "complete" || state.measurement.active || state.calibration.active) return
   state.flow = "baseline"
   state.calibration.holdTimer = true
@@ -665,6 +697,7 @@ function measureAgain() {
 }
 
 function startMeasurement() {
+  baselineSaveNotice = null
   if (state.measurement.active || !canStartMeasurement()) {
     return
   }
@@ -675,6 +708,7 @@ function startMeasurement() {
   state.exportSnapshot.axisMax = 20
   resetLiveSessionState()
   state.measurement.active = true
+  window.NeuroFrontAccount?.deviceBusy()
   state.measurement.completed = false
   window.NeuroFrontAssistant?.captureStarted()
   state.measurement.revealed = true
@@ -1035,6 +1069,7 @@ function handleDisconnect() {
   state.displayTemperature = DISCONNECTED_TEMPERATURE
   state.temperatureTrend = "stable"
   state.measurement.active = false
+  window.NeuroFrontAccount?.deviceBusy()
   if (!hasCompletedPreview) {
     state.exportSnapshot.buffer = []
     state.exportSnapshot.axisMin = -20
@@ -1133,6 +1168,7 @@ async function connectBluetooth() {
 }
 
 function bindEvents() {
+  document.addEventListener("neurofront:accountchange", updateAccountBaselineNotice)
   refs.connectButton.addEventListener("click", connectBluetooth)
   refs.measureAgainButton.addEventListener("click", measureAgain)
   refs.exportButton.addEventListener("click", exportChartAsPng)
@@ -1158,5 +1194,40 @@ function init() {
   })
   requestAnimationFrame(animationLoop)
 }
+
+window.NeuroFrontDevice = Object.freeze({
+  busy: () => state.calibration.active || state.measurement.active,
+  validBaseline: validateSavedBaseline,
+  loadGuestBaseline: loadSavedBaseline,
+  setSavedBaseline(record) {
+    state.savedBaseline = validateSavedBaseline(record) ? record : null
+    if (!state.measurement.active && !state.calibration.active && state.baseline.ready && state.baseline.createdAt !== state.savedBaseline?.createdAt) {
+      state.baseline.ready = false
+      state.flow = "baseline"
+      window.NeuroFrontI18n.setMessage(refs.baselineActionStatus, "account.chooseBaseline")
+    }
+    updateSavedBaselineInfo()
+    updateControlsAvailability(performance.now())
+  },
+  resetForAccount() {
+    baselineSaveNotice = null
+    const interrupted = state.measurement.active || state.calibration.active
+    if (refs.measurementDialog.open) refs.measurementDialog.close("account-changed")
+    state.calibration = { active: false, startTime: 0, samples: [], holdTimer: true }
+    state.measurement = { active: false, startTime: 0, samples: [], completed: false, revealed: false }
+    state.baseline = { samples: [], ready: false, mean: 0, rms: 0, stdDev: 0, peakToPeak: 0, derivativeMean: 0 }
+    state.savedBaseline = null
+    state.summary = { average: 0, peak: 0, minimum: 0, activityLabel: "Stable" }
+    state.exportSnapshot = { buffer: [], axisMin: -20, axisMax: 20 }
+    state.liveBuffer.fill(IDLE_BASELINE); state.displayBuffer.fill(IDLE_BASELINE)
+    state.flow = "baseline"
+    refs.summaryPanel.classList.remove("visible")
+    refs.countdownCard.classList.remove("is-running")
+    resetLiveSessionState(); renderSummary(); refreshStressState([])
+    setBaselineTimer(MEASUREMENT_MS / 1000, 0, "Measurement Window", "Choose a baseline")
+    window.NeuroFrontI18n.setMessage(refs.baselineActionStatus, interrupted ? "account.captureInterrupted" : "account.chooseBaseline")
+    updateSavedBaselineInfo(); updateControlsAvailability(performance.now())
+  }
+})
 
 init()

@@ -325,9 +325,10 @@ test("Vercel and local static routes explicitly exclude secrets, server code and
   const staticFiles = config.builds.filter(build => build.use === "@vercel/static").map(build => build.src)
   const { publicFiles } = require("./local-server.cjs")
   assert.deepEqual([...staticFiles].sort(), [...publicFiles].sort())
-  for (const filename of [".env", ".env.example", "assistant-server.cjs", "assistant-server.test.cjs", "local-server.cjs", "README.md", "vercel.json"]) assert.ok(!publicFiles.has(filename))
+  for (const filename of [".env", ".env.example", "assistant-server.cjs", "accounts-server.cjs", "accounts-migration.sql", "assistant-server.test.cjs", "accounts-backend.test.cjs", "local-server.cjs", "README.md", "vercel.json"]) assert.ok(!publicFiles.has(filename))
   assert.equal(config.routes[0].src, "/api/assistant")
-  assert.equal(config.routes[1].status, 404)
+  assert.equal(config.routes.find(route => route.src === "/assistant-api(?:\\.js)?").status, 404)
+  assert.equal(config.routes.find(route => route.src === "/account-config-api(?:\\.js)?").status, 404)
 })
 
 test("local HTTP preview serves the dashboard and API without exposing private files", async () => {
@@ -339,7 +340,7 @@ test("local HTTP preview serves the dashboard and API without exposing private f
     const page = await fetch(origin)
     assert.equal(page.status, 200)
     assert.match(await page.text(), /NeuroFront/)
-    for (const route of ["/.env.example", "/assistant-server.cjs", "/assistant-api.js", "/assistant-server.test.cjs", "/vercel.json", "/ASSISTANT_SETUP.md", "/.git/config"]) {
+    for (const route of ["/.env.example", "/assistant-server.cjs", "/accounts-server.cjs", "/accounts-migration.sql", "/account-config-api.js", "/assistant-api.js", "/assistant-server.test.cjs", "/vercel.json", "/ASSISTANT_SETUP.md", "/.git/config"]) {
       const result = await fetch(`${origin}${route}`)
       assert.equal(result.status, 404, route)
     }

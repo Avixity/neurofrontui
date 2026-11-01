@@ -115,7 +115,7 @@ const url = process.env.NEUROFRONT_URL || 'http://127.0.0.1:5180'
     mode = 'delayed'
     await page.locator('#assistantInput').fill('Explain my baseline')
     await page.locator('#assistantSend').click()
-    await page.waitForTimeout(150)
+    for (let attempt = 0; attempt < 100 && !delayed; attempt++) await page.waitForTimeout(100)
     assert.ok(delayed)
     const before = requests.length
     await page.evaluate(() => { NeuroFrontAssistant.explain(NeuroFrontHistory.getLatest()); NeuroFrontAssistant.explain(NeuroFrontHistory.getLatest()) })

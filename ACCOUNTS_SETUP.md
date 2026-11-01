@@ -1,0 +1,97 @@
+# NeuroFront cloud accounts
+
+The dashboard remains available to guests without Supabase. Account authentication is performed by Supabase Auth inside the dashboard popup. Account records use Postgres, and avatar images use a private Supabase Storage bucket. No application password table or service-role key is used.
+
+## Required provider setup
+
+No Supabase credentials or email provider were available during implementation. Until the following setup is completed, the account popup reports that accounts are unavailable. It does not simulate registration, sign-in or cloud saving.
+
+1. Create or select the intended Supabase project. In its SQL editor, execute the entire `accounts-migration.sql` file as the project database owner. Keep a copy of the migration in the project's migration history. It creates only the `nf_*` application tables, checked RPCs and the private `nf-avatars` bucket.
+2. In Authentication, enable Email with email/password sign-in. Keep email confirmation enabled if verification is required. Configure a production SMTP provider, sender name and sender address. Supabase's default development email service has delivery and recipient restrictions and is not a substitute for production SMTP. Verify delivery of both confirmation and password-reset messages.
+3. Set Authentication URL Configuration **Site URL** to `https://neurofrontui.vercel.app/`. Add that exact URL and `http://localhost:5183/` (or the local port in use) to allowed redirect URLs. If using `127.0.0.1` for local checks, allow `http://127.0.0.1:5183/` too. Add only trusted preview URLs when testing email flows there. Both verification and recovery return to the existing dashboard, whose popup handles the callback. No separate account page is needed.
+4. Add `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` from the same project's API settings to `.env.local` and to the existing Vercel project's production and preview environments. A legacy `SUPABASE_ANON_KEY` is supported only as a fallback. Never put a service-role key in either public-key setting. Keep `GROQ_API_KEY` server-side as before.
+5. Restart the local server and redeploy Vercel so the configuration endpoint receives those environment variables. Use `node --env-file=.env.local local-server.cjs` with `PORT=5183` for the current test preview at `http://localhost:5183/`.
+6. Confirm the public `GET /api/account-config` endpoint returns `{ "configured": true, "url": "https://YOUR_PROJECT.supabase.co", "publishableKey": "YOUR_PUBLIC_KEY" }`. It requires no user token because the publishable/anon key is designed for browser use. Other methods return 405; responses are not cached. Missing or unsafe configuration returns `{ "configured": false }`, never a secret or provider error. This endpoint exposes only the intended public Supabase URL and publishable/anon key.
+
+The browser uses the locally bundled **`@supabase/supabase-js` version `2.118.0`** in `supabase-2.118.0.js`. It is loaded only when cloud configuration is available, with PKCE, supported persistent session management and automatic refresh enabled. Registration, confirmation and recovery callbacks return to the dashboard popup. PKCE email links should be completed in the browser that initiated the flow so its verifier is available; after a confirmation in another browser, return and sign in normally. The current browser integration accepts the project's standard `https://<project-ref>.supabase.co` URL. No framework migration or browser-side custom password handling is involved.
+
+Passwords are submitted directly to Supabase Auth. Do not log passwords, reset links, access tokens or refresh tokens. The browser needs the provider-managed session token storage to restore an account across refreshes; application tables contain no password values.
+
+## Schema and ownership
+
+| Table | Stored data | Identity |
+| --- | --- | --- |
+| `nf_profiles` | Display name, private avatar path, preferences, active baseline and optimistic revision | Authenticated user ID |
+| `nf_baselines` | Immutable complete calibration payload with samples, features, device setup and calculation/schema versions | Owner and stable baseline ID |
+| `nf_captures` | Immutable full measurement snapshot, graph samples, readings, score/category, summary and exact baseline snapshot | Owner and stable capture ID |
+| `nf_threads` | Conversation title, selected capture and optimistic revision | Owner and stable thread ID |
+| `nf_messages` | Ordered structured messages, preset content/context and pending/completed/failed/stopped status | Owner, thread ID and stable message ID |
+
+Row-level security permits authenticated users to read and delete only their own records. Anonymous clients cannot read private tables or execute the write RPCs. Direct application INSERT/UPDATE grants are revoked. Functions run with a fixed empty search path, derive the owner from `auth.uid()` and validate data before writing. Neither client-supplied IDs nor guessed record IDs establish authority.
+
+Composite foreign keys bind a capture to that owner's baseline, a thread to that owner's capture, and a message to that owner's thread and optional capture. The active profile baseline must also belong to the same user. Referenced baselines/captures cannot be removed while historical relationships still depend on them. Deleting a thread cascades to its messages.
+
+The RPCs are:
+
+- `nf_save_baseline(p_id, p_payload)`: inserts one immutable calibration version. An identical retry succeeds; conflicting data under the same ID fails.
+- `nf_save_capture(p_id, p_baseline_id, p_payload)`: validates the complete snapshot against the immutable baseline and stores it once. An identical retry succeeds.
+- `nf_save_profile(p_expected_revision, p_display_name, p_avatar_path, p_preferences, p_active_baseline_id)`: creates the initial profile at revision zero when absent, then updates with optimistic concurrency. Conflicting stale edits fail with SQLSTATE `40001` rather than silently overwriting another browser. An identical retry after a lost acknowledgement returns the already-saved revision.
+- `nf_save_thread(p_id, p_expected_revision, p_title, p_capture_id, p_messages)`: atomically saves the thread and ordered messages, validating every linked capture and snapshot. It uses the same revision and retry rules. Messages are `{id, ordinal, payload}` and payload status must describe the real request state.
+
+Returned values are the saved database rows. Show cloud success only after a successful RPC response. Pending work stays associated with its original authenticated owner. A baseline/capture conflict is an integrity issue to surface, not permission to create a duplicate record under a new ID.
+
+## Avatars
+
+`nf-avatars` is private with a 2 MiB file-size limit and only WebP, PNG and JPEG MIME types. The popup decodes and re-encodes a selected image before upload. Each object path is `<authenticated user ID>/<random ID>.webp` (PNG/JPEG paths are also accepted by policy). Storage RLS restricts read, insert, update and delete to that user's first path segment. Profile avatar paths enforce the same ownership. Use authenticated downloads or short-lived signed URLs; do not make the bucket public. Do not accept SVG or user-supplied HTML.
+
+## Assistant account context
+
+An authenticated assistant request sends a Bearer access token and `{language, messages, context: null, accountCaptureId}`. `accountCaptureId` may be null for general questions. The server checks the token with Supabase Auth's `/auth/v1/user` endpoint, then loads any selected capture with that verified owner and the same token. Postgres RLS independently applies to the request. A missing or other-user capture returns a safe not-found response. Authenticated clients cannot submit an alternate client-controlled measurement context or owner ID.
+
+The server reads at most 120 earlier account captures, computes compatibility and comparisons from stored immutable records, and supplies at most 12 concise summaries to Groq. Raw time-series samples, email addresses, avatar data and account tokens are not sent to the model. A prior-history read failure is explicitly unavailable and is not described as an increase, decrease or empty history. Guest requests retain the existing bounded, validated read-only context. All existing model input/output validation, deadlines, limits and safe rendering remain in effect.
+
+## Guest import and privacy
+
+Guest measurements remain in their existing local storage until the user explicitly selects the import action. Imports retain their original dates and stable IDs. Baselines are saved before dependent captures. Duplicate-safe RPCs permit retrying interrupted imports without duplication. Guest data must never be silently uploaded at sign-in, and an account's private local pending queue must never be imported into a different account.
+
+Signing out or switching accounts clears the visible private capture/chat/baseline state, invalidates outstanding requests and preserves the Bluetooth transport. In-flight measurement ownership is fixed when it starts; the application prevents an account transition from assigning it to someone else. Account-backed records remain private to that owner even if an upload is pending when the session changes.
+
+## Verification
+
+Run `node --test accounts-backend.test.cjs assistant-server.test.cjs` for HTTP/auth/context validation and existing assistant safeguards. The database test can execute against PostgreSQL embedded through PGlite without needing provider credentials:
+
+1. Install `@electric-sql/pglite` in a temporary development-tool directory outside the application.
+2. Set `PGLITE_MODULE` to that package's absolute installed directory.
+3. Run `node --test accounts-backend.test.cjs`.
+
+The database fixture supplies two test identities plus minimal Supabase Auth/Storage schemas. It executes the actual migration and checks RLS isolation, grants, immutable snapshots, invalid/foreign baseline references, message ownership, storage policies, duplicate writes and stale profile/thread revisions. PGlite runs PostgreSQL; this test does not establish live Supabase Auth, SMTP, Storage HTTP or production deployment correctness.
+
+Browser suites use Playwright with a local Chromium installation. Set `PLAYWRIGHT_MODULE` to the installed Playwright module directory and `CHROMIUM_PATH` to its Chromium executable if those tools are not already resolvable. Start the local server on port 5183, then set `NEUROFRONT_URL=http://127.0.0.1:5183`. Run these commands sequentially so simultaneous browser suites do not distort timing or consume unnecessary memory:
+
+```text
+node accounts-store.test.cjs
+node accounts-chat.test.cjs
+node account-ui.test.cjs
+node accounts-flow.test.cjs
+```
+
+- `accounts-store.test.cjs` uses a mocked Auth SDK and owner-scoped REST store to test deliberate guest imports, exact snapshots, duplicate-safe writes, cached pending data, offline retries, revision conflicts and restoration in a separate browser context.
+- `accounts-chat.test.cjs` tests the temporary availability notice, dismiss/focus/hover timing, persistent message Retry, structured conversation statuses and account-context clearing with mocked account/provider responses.
+- `account-ui.test.cjs` checks actual popup controls, validation, profile/initials, keyboard access, language changes and desktop/mobile layouts with mocked account actions.
+- `accounts-flow.test.cjs` runs the complete actual dashboard against simulated Bluetooth notifications and a mocked Supabase Auth/REST implementation. It collects 400 calibration notifications and 300 capture samples through the existing routines, advances their elapsed-time state to the real 20/15-second boundaries, verifies exact persisted snapshots and recalibration history, exports an older PNG, tests explicit idempotent guest import, preserves the connection on sign-out, cancels a capture on forced account switching and restores the saved baseline in a separate mobile browser context.
+
+These browser fixtures are explicitly simulated. They do not register real people, send verification emails, contact a real model, persist to Supabase, or establish physical-device Bluetooth performance. The SQL test validates actual PostgreSQL policies separately. A separate browser context demonstrates restoration through the simulated backend, not an independent physical device or live cloud account.
+
+After configuring the real project, complete this live check with two disposable accounts and two separate browser profiles:
+
+1. Register, verify email, sign in, refresh, request password recovery, reset the password and sign out.
+2. Calibrate and complete a simulated or physical capture. Verify backend confirmation, refresh, then sign in through the second browser and restore that baseline, capture, export and conversation.
+3. Explicitly import the same guest data twice and verify record counts remain unchanged on the second import.
+4. Recalibrate and verify the prior capture's score, graph, baseline and stored explanation remain unchanged.
+5. In the second account, try selecting the first account's IDs through REST and the assistant. Confirm no rows and no private responses are returned.
+6. Disable networking during a save. Reconnect and retry, confirming one record with the original ID and owner. Test simultaneous preference edits in two browsers and verify a revision conflict is shown.
+7. Switch/sign out during calibration or measurement and confirm the user-facing safety flow, device connection and ownership remain correct.
+
+Live email delivery, real cross-device Supabase persistence and physical NeuroFront hardware cannot be verified without the corresponding configured services and hardware. They must not be represented as tested merely because the local SQL and mocked-auth tests pass.
+
+Official setup references: [Supabase Auth user verification](https://supabase.com/docs/reference/javascript/auth-getuser), [Row-level security](https://supabase.com/docs/guides/database/postgres/row-level-security), [Storage access control](https://supabase.com/docs/guides/storage/security/access-control), [Redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls), [Custom SMTP](https://supabase.com/docs/guides/auth/auth-smtp).
