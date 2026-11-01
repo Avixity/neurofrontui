@@ -15,16 +15,26 @@
   <header class="topbar">
     <div class="brand-block">
       <div>
-        <p class="eyebrow">Biosignal Monitoring Interface</p>
+        <p class="eyebrow" data-i18n="brand.eyebrow">Biosignal Monitoring Interface</p>
         <div class="brand-assets">
           <img class="brand-icon" src="icon-512.png" alt="NeuroFront icon">
           <img class="brand-logo" src="NEUROFRONTLOGO.png" alt="NeuroFront">
         </div>
       </div>
     </div>
-    <div class="status-pill" id="statusPill" data-state="disconnected">
-      <span class="status-dot"></span>
-      <span id="statusText">Disconnected</span>
+    <div class="connection-controls">
+      <div class="language-picker" id="languagePicker">
+        <button class="status-pill language-button" id="languageButton" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="languageMenu" aria-label="Language: English">
+          <svg class="language-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></svg>
+          <span id="languageLabel" dir="auto">English</span>
+          <svg class="language-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+        </button>
+        <ul class="language-menu" id="languageMenu" role="listbox" aria-label="Language" hidden></ul>
+      </div>
+      <div class="status-pill" id="statusPill" data-state="disconnected">
+        <span class="status-dot"></span>
+        <span id="statusText" data-i18n="device.disconnected">Disconnected</span>
+      </div>
     </div>
   </header>
 
@@ -33,14 +43,14 @@
       <section class="panel chart-panel">
         <div class="panel-head">
           <div>
-            <p class="eyebrow">Live Signal Feed</p>
-            <h2>Primary Trace</h2>
+            <p class="eyebrow" data-i18n="signal.feed">Live Signal Feed</p>
+            <h2 data-i18n="signal.trace">Primary Trace</h2>
           </div>
           <div class="stream-meta">
-            <div class="meta-chip" id="sourceBadge">No Signal</div>
+            <div class="meta-chip" id="sourceBadge" data-i18n="signal.none">No Signal</div>
             <div class="meta-stack">
-              <span class="meta-label">Lead State</span>
-              <strong id="leadState">Nominal</strong>
+              <span class="meta-label" data-i18n="lead.state">Lead State</span>
+              <strong id="leadState" data-i18n="lead.nominal">Nominal</strong>
             </div>
           </div>
         </div>
@@ -51,7 +61,7 @@
             <span id="yAxisBottom">-20</span>
           </div>
           <div class="chart-wrap">
-            <div class="chart-overlay" id="chartOverlay">Awaiting NeuroFront signal</div>
+            <div class="chart-overlay" id="chartOverlay" data-i18n="signal.awaiting">Awaiting NeuroFront signal</div>
             <canvas id="signalChart"></canvas>
           </div>
         </div>
@@ -66,22 +76,22 @@
       <section class="panel summary-panel" id="summaryPanel">
         <div class="panel-head compact">
           <div>
-            <p class="eyebrow">Session Summary</p>
-            <h2>Capture Results</h2>
+            <p class="eyebrow" data-i18n="session.summary">Session Summary</p>
+            <h2 data-i18n="session.results">Capture Results</h2>
           </div>
-          <div class="activity-badge" id="activityLabel">Stable</div>
+          <div class="activity-badge" id="activityLabel" data-i18n="activity.stable">Stable</div>
         </div>
         <div class="summary-grid">
           <div class="summary-card">
-            <span class="summary-label">Average</span>
+            <span class="summary-label" data-i18n="summary.average">Average</span>
             <strong id="avgValue">0.0</strong>
           </div>
           <div class="summary-card">
-            <span class="summary-label">Peak</span>
+            <span class="summary-label" data-i18n="summary.peak">Peak</span>
             <strong id="peakValue">0.0</strong>
           </div>
           <div class="summary-card">
-            <span class="summary-label">Minimum</span>
+            <span class="summary-label" data-i18n="summary.minimum">Minimum</span>
             <strong id="minValue">0.0</strong>
           </div>
         </div>
@@ -90,18 +100,18 @@
       <section class="panel setup-panel">
         <div class="panel-head compact">
           <div>
-            <p class="eyebrow">Electrode Placement</p>
-            <h2>Setup Guide</h2>
+            <p class="eyebrow" data-i18n="setup.electrodes">Electrode Placement</p>
+            <h2 data-i18n="setup.guide">Setup Guide</h2>
           </div>
         </div>
         <div class="setup-card">
-          <img class="setup-image" src="image.png" alt="Electrode placement guide">
+          <img class="setup-image" src="image.png" alt="Electrode placement guide" data-i18n-alt="setup.image">
           <div class="setup-copy">
-            <p class="setup-text"><strong>Placement:</strong> Red on right, yellow on left, green on earlobe or side of neck.</p>
+            <p class="setup-text"><strong data-i18n="setup.placement">Placement:</strong> <span data-i18n="setup.position">Red on right, yellow on left, green on earlobe or side of neck.</span></p>
             <ul class="setup-list">
-              <li>Peel each electrode off slowly so the conductive gel stays intact.</li>
-              <li>Wipe the skin first and let it dry before applying the pads.</li>
-              <li>Press each electrode down for a few seconds to improve contact.</li>
+              <li data-i18n="setup.peel">Peel each electrode off slowly so the conductive gel stays intact.</li>
+              <li data-i18n="setup.clean">Wipe the skin first and let it dry before applying the pads.</li>
+              <li data-i18n="setup.press">Press each electrode down for a few seconds to improve contact.</li>
             </ul>
           </div>
         </div>
@@ -111,55 +121,55 @@
     <aside class="side-panel">
       <section class="panel metric-panel">
         <div class="metric-card emphasis">
-          <span class="metric-label">Signal Level</span>
+          <span class="metric-label" data-i18n="signal.level">Signal Level</span>
           <div class="metric-row">
             <span class="metric-value" id="signalValue">0.0</span>
             <span class="metric-unit">uV</span>
           </div>
-          <p class="metric-detail" id="signalDetail">No live signal detected</p>
+          <p class="metric-detail" id="signalDetail" data-i18n="signal.noLive">No live signal detected</p>
         </div>
         <div class="metric-card">
-          <span class="metric-label">Temperature</span>
+          <span class="metric-label" data-i18n="temperature">Temperature</span>
           <div class="metric-row">
             <span class="metric-value" id="tempValue">0.00</span>
             <span class="metric-unit">&deg;C</span>
           </div>
           <div class="trend-pill" id="tempTrend" data-trend="stable">
             <span class="trend-line"></span>
-            <span id="tempTrendText">Stable</span>
+            <span id="tempTrendText" data-i18n="activity.stable">Stable</span>
           </div>
         </div>
         <div class="metric-card">
-          <span class="metric-label">GSR (Sweat)</span>
+          <span class="metric-label" data-i18n="gsr">GSR (Sweat)</span>
           <div class="metric-row">
             <span class="metric-value" id="gsrValue">0.0</span>
             <span class="metric-unit">µS</span>
           </div>
-          <p class="metric-detail" id="gsrDetail">No signal detected</p>
+          <p class="metric-detail" id="gsrDetail" data-i18n="signal.noData">No signal detected</p>
         </div>
         <div class="metric-card stress-card">
           <div class="stress-head">
-            <span class="metric-label">Stress Meter</span>
+            <span class="metric-label" data-i18n="stress.meter">Stress Meter</span>
             <strong class="stress-score" id="stressScore">50</strong>
           </div>
           <div class="stress-bar">
             <span class="stress-fill" id="stressFill"></span>
           </div>
           <div class="stress-scale">
-            <span>Relaxed</span>
-            <span>High</span>
+            <span data-i18n="stress.relaxed">Relaxed</span>
+            <span data-i18n="stress.high">High</span>
           </div>
-          <strong class="stress-label" id="stressLabel">Baseline</strong>
-          <p class="metric-detail" id="stressFeedback">Connect and sit relaxed for 20 seconds to calibrate your session baseline.</p>
-          <p class="baseline-note" id="baselineNote">Baseline target: 50/100</p>
+          <strong class="stress-label" id="stressLabel" data-i18n="baseline">Baseline</strong>
+          <p class="metric-detail" id="stressFeedback" data-i18n="baseline.prepare">Connect and sit relaxed for 20 seconds to calibrate your session baseline.</p>
+          <p class="baseline-note" id="baselineNote" data-i18n="baseline.target">Baseline target: 50/100</p>
         </div>
       </section>
 
       <section class="panel controls-panel">
         <div class="button-group">
-          <button id="connectButton" class="action-button primary">Connect</button>
-          <button id="measureButton" class="action-button accent" disabled>Start Measurement</button>
-          <button id="exportButton" class="action-button ghost">Export PNG</button>
+          <button id="connectButton" class="action-button primary" data-i18n="device.connect">Connect</button>
+          <button id="measureButton" class="action-button accent" disabled data-i18n="measurement.start">Start Measurement</button>
+          <button id="exportButton" class="action-button ghost" data-i18n="export.png">Export PNG</button>
         </div>
         <div class="countdown-card" id="countdownCard">
           <div class="countdown-ring">
@@ -173,17 +183,19 @@
             </div>
           </div>
           <div class="countdown-text">
-            <span class="countdown-label">Measurement Window</span>
-            <strong id="measurementState">Ready for 15 second capture</strong>
+            <span class="countdown-label" data-i18n="measurement.window">Measurement Window</span>
+            <strong id="measurementState" data-i18n="measurement.ready">Ready for 15 second capture</strong>
           </div>
         </div>
       </section>
     </aside>
   </main>
-  <p class="page-disclaimer">This should not be taken as a proper medical diagnosis.</p>
+  <p class="page-disclaimer" data-i18n="disclaimer">This should not be taken as a proper medical diagnosis.</p>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="language-data.js" defer></script>
+<script src="language.js" defer></script>
 <script src="app.js" defer></script>
 </body>
 </html>

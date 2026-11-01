@@ -202,39 +202,39 @@ function setStatus(status) {
   state.status = status
   refs.statusPill.dataset.state = status
   if (status === "connecting") {
-    refs.statusText.textContent = "Connecting"
+    window.NeuroFrontI18n.setText(refs.statusText, "Connecting")
     return
   }
   if (status === "connected") {
-    refs.statusText.textContent = "Connected"
+    window.NeuroFrontI18n.setText(refs.statusText, "Connected")
     return
   }
   if (status === "leads-off") {
-    refs.statusText.textContent = "Leads Off"
+    window.NeuroFrontI18n.setText(refs.statusText, "Leads Off")
     return
   }
-  refs.statusText.textContent = "Disconnected"
+  window.NeuroFrontI18n.setText(refs.statusText, "Disconnected")
 }
 
 function updateSourceBadge(source) {
   if (state.measurement.completed && state.exportSnapshot.buffer.length) {
-    refs.sourceBadge.textContent = "Preview"
+    window.NeuroFrontI18n.setText(refs.sourceBadge, "Preview")
     return
   }
-  refs.sourceBadge.textContent = source === "bluetooth" ? "Bluetooth" : "No Signal"
+  window.NeuroFrontI18n.setText(refs.sourceBadge, source === "bluetooth" ? "Bluetooth" : "No Signal")
 }
 
 function updateLeadState() {
-  refs.leadState.textContent = isDeviceConnected() ? "Nominal" : "Offline"
+  window.NeuroFrontI18n.setText(refs.leadState, isDeviceConnected() ? "Nominal" : "Offline")
 }
 
 function updateStressMeter(score, label, feedback, note) {
   const clampedScore = clamp(score, 0, 100)
   refs.stressScore.textContent = `${Math.round(clampedScore)}/100`
   refs.stressFill.style.width = `${clampedScore}%`
-  refs.stressLabel.textContent = label
-  refs.stressFeedback.textContent = feedback
-  refs.baselineNote.textContent = note
+  window.NeuroFrontI18n.setText(refs.stressLabel, label)
+  window.NeuroFrontI18n.setText(refs.stressFeedback, feedback)
+  window.NeuroFrontI18n.setText(refs.baselineNote, note)
 }
 
 function refreshStressState(sampleWindow) {
@@ -286,14 +286,14 @@ function refreshStressState(sampleWindow) {
 function updateTrendLabel() {
   refs.tempTrend.dataset.trend = state.temperatureTrend
   if (state.temperatureTrend === "rising") {
-    refs.tempTrendText.textContent = "Rising"
+    window.NeuroFrontI18n.setText(refs.tempTrendText, "Rising")
     return
   }
   if (state.temperatureTrend === "falling") {
-    refs.tempTrendText.textContent = "Cooling"
+    window.NeuroFrontI18n.setText(refs.tempTrendText, "Cooling")
     return
   }
-  refs.tempTrendText.textContent = "Stable"
+  window.NeuroFrontI18n.setText(refs.tempTrendText, "Stable")
 }
 
 function resetLiveSessionState() {
@@ -315,21 +315,21 @@ function resetLiveSessionState() {
   refs.signalValue.textContent = IDLE_BASELINE.toFixed(1)
   refs.tempValue.textContent = DISCONNECTED_TEMPERATURE.toFixed(2)
   refs.gsrValue.textContent = "0.0"
-  refs.gsrDetail.textContent = "No signal detected"
-  refs.signalDetail.textContent = "No live signal detected"
+  window.NeuroFrontI18n.setText(refs.gsrDetail, "No signal detected")
+  window.NeuroFrontI18n.setText(refs.signalDetail, "No live signal detected")
 }
 
 function setMeasurementIdle() {
   refs.countdownCard.classList.remove("is-running")
   refs.measureButton.disabled = !canStartMeasurement()
-  refs.measureButton.textContent = state.baseline.ready ? "Start Measurement" : "Calibrating Baseline"
+  window.NeuroFrontI18n.setText(refs.measureButton, state.baseline.ready ? "Start Measurement" : "Calibrating Baseline")
 }
 
 function renderSummary() {
   refs.avgValue.textContent = state.summary.average.toFixed(1)
   refs.peakValue.textContent = state.summary.peak.toFixed(1)
   refs.minValue.textContent = state.summary.minimum.toFixed(1)
-  refs.activityLabel.textContent = state.summary.activityLabel
+  window.NeuroFrontI18n.setText(refs.activityLabel, state.summary.activityLabel)
   refs.activityLabel.className = "activity-badge"
   if (state.summary.activityLabel === "Moderate Activity") {
     refs.activityLabel.classList.add("moderate")
@@ -466,7 +466,7 @@ function finalizeMeasurement() {
   state.measurement.completed = true
   state.measurement.revealed = true
   setMeasurementIdle()
-  refs.measurementState.textContent = "Measurement complete"
+  window.NeuroFrontI18n.setText(refs.measurementState, "Measurement complete")
   const samples = state.measurement.samples.slice()
   state.exportSnapshot.buffer = samples.slice()
   state.exportSnapshot.axisMin = state.axisMin
@@ -518,9 +518,9 @@ function startMeasurement() {
   state.gsr = state.gsrBaseline
   state.temperatureTrend = "stable"
   refreshStressState([])
-  refs.measurementState.textContent = "Recording in progress"
+  window.NeuroFrontI18n.setText(refs.measurementState, "Recording in progress")
   refs.measureButton.disabled = true
-  refs.measureButton.textContent = "Recording"
+  window.NeuroFrontI18n.setText(refs.measureButton, "Recording")
   refs.countdownCard.classList.add("is-running")
   refs.countdownValue.textContent = "15.0"
   refs.countdownRing.style.strokeDashoffset = "0"
@@ -590,25 +590,25 @@ function updateReadouts() {
   refs.signalValue.textContent = state.displaySignal.toFixed(1)
   refs.tempValue.textContent = state.displayTemperature.toFixed(2)
   refs.gsrValue.textContent = state.displayGsr.toFixed(1)
-  refs.signalDetail.textContent = state.source === "bluetooth" ? "Live signal from NeuroFront" : "No live signal detected"
+  window.NeuroFrontI18n.setText(refs.signalDetail, state.source === "bluetooth" ? "Live signal from NeuroFront" : "No live signal detected")
   
   // GSR classification
   if (state.status === "connected" && !state.measurement.active) {
-    refs.gsrDetail.textContent = "Ready for baseline calibration"
+    window.NeuroFrontI18n.setText(refs.gsrDetail, "Ready for baseline calibration")
   } else if (state.measurement.active) {
     if (state.displayGsr < 3.5) {
-      refs.gsrDetail.textContent = "Deep relaxation detected"
+      window.NeuroFrontI18n.setText(refs.gsrDetail, "Deep relaxation detected")
     } else if (state.displayGsr < 5.5) {
-      refs.gsrDetail.textContent = "Calm state"
+      window.NeuroFrontI18n.setText(refs.gsrDetail, "Calm state")
     } else if (state.displayGsr < 8.0) {
-      refs.gsrDetail.textContent = "Focused state"
+      window.NeuroFrontI18n.setText(refs.gsrDetail, "Focused state")
     } else if (state.displayGsr < 12.0) {
-      refs.gsrDetail.textContent = "Mild stress"
+      window.NeuroFrontI18n.setText(refs.gsrDetail, "Mild stress")
     } else {
-      refs.gsrDetail.textContent = "High stress detected"
+      window.NeuroFrontI18n.setText(refs.gsrDetail, "High stress detected")
     }
   } else {
-    refs.gsrDetail.textContent = "No signal detected"
+    window.NeuroFrontI18n.setText(refs.gsrDetail, "No signal detected")
   }
   
   updateTrendLabel()
@@ -659,11 +659,11 @@ function updateChartState(now) {
   const revealed = state.measurement.revealed
   const previewVisible = state.measurement.completed && state.exportSnapshot.buffer.length
   if (previewVisible) {
-    refs.chartOverlay.textContent = "Latest captured measurement"
+    window.NeuroFrontI18n.setText(refs.chartOverlay, "Latest captured measurement")
   } else if (!revealed) {
-    refs.chartOverlay.textContent = "Start measurement to view live trace"
+    window.NeuroFrontI18n.setText(refs.chartOverlay, "Start measurement to view live trace")
   } else if (!live) {
-    refs.chartOverlay.textContent = "Awaiting NeuroFront signal"
+    window.NeuroFrontI18n.setText(refs.chartOverlay, "Awaiting NeuroFront signal")
   }
   refs.chartOverlay.classList.toggle("is-hidden", previewVisible || (live && revealed))
 }
@@ -671,7 +671,7 @@ function updateChartState(now) {
 function updateControlsAvailability(now) {
   refs.measureButton.disabled = state.measurement.active || !canStartMeasurement()
   if (!state.measurement.active) {
-    refs.measureButton.textContent = state.baseline.ready ? "Start Measurement" : "Calibrating Baseline"
+    window.NeuroFrontI18n.setText(refs.measureButton, state.baseline.ready ? "Start Measurement" : "Calibrating Baseline")
   }
 }
 
@@ -855,8 +855,8 @@ function handleDisconnect() {
     state.measurement.completed = true
     state.measurement.revealed = true
   }
-  refs.connectButton.textContent = "Connect"
-  refs.measurementState.textContent = "Ready for 15 second capture"
+  window.NeuroFrontI18n.setText(refs.connectButton, "Connect")
+  window.NeuroFrontI18n.setText(refs.measurementState, "Ready for 15 second capture")
   refs.countdownValue.textContent = "15.0"
   if (!hasCompletedPreview) {
     refs.summaryPanel.classList.remove("visible")
@@ -903,7 +903,7 @@ async function connectBluetooth() {
     return
   }
   refs.connectButton.disabled = true
-  refs.connectButton.textContent = "Connecting..."
+  window.NeuroFrontI18n.setText(refs.connectButton, "Connecting...")
   setStatus("connecting")
   try {
     if (state.characteristic) {
@@ -927,7 +927,7 @@ async function connectBluetooth() {
     state.device = device
     device.addEventListener("gattserverdisconnected", handleDisconnect)
     const server = device.gatt.connected ? device.gatt : await device.gatt.connect()
-    refs.connectButton.textContent = "Reconnect"
+    window.NeuroFrontI18n.setText(refs.connectButton, "Reconnect")
     setStatus("connected")
     const service = await server.getPrimaryService(SERVICE_UUID)
     const characteristic = await service.getCharacteristic(CHAR_UUID)
