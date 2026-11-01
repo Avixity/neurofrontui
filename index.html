@@ -203,7 +203,7 @@
       <section class="panel history-panel" aria-labelledby="historyTitle">
         <div class="panel-head compact">
           <div>
-            <h2 id="historyTitle" data-i18n="history.title">Capture History</h2>
+            <h2 id="historyTitle" tabindex="-1" data-i18n="history.title">Capture History</h2>
             <p class="section-caption" id="historyStorageLabel" data-i18n="history.local">Saved on this device</p>
           </div>
         </div>
@@ -304,8 +304,20 @@
     <dl class="capture-features" id="captureBaselineFeatures"></dl>
   </section>
   <div class="capture-dialog-actions">
+    <button class="action-button ghost capture-delete-button" id="captureDelete" type="button" data-i18n="history.delete">Delete capture</button>
     <button class="action-button accent" id="captureExplain" type="button" aria-controls="assistantPanel" data-i18n="assistant.getMore">Get to know more</button>
     <button class="action-button ghost" id="captureExport" type="button" data-i18n="export.png">Export PNG</button>
+  </div>
+</dialog>
+
+<dialog class="content-dialog capture-delete-dialog" id="captureDeleteDialog" aria-labelledby="captureDeleteTitle" aria-describedby="captureDeleteDescription captureDeleteDate">
+  <h2 id="captureDeleteTitle" data-i18n="history.deleteTitle">Delete this capture?</h2>
+  <p class="section-caption" id="captureDeleteDate"></p>
+  <p id="captureDeleteDescription" data-i18n="history.deleteDescription">This removes the saved capture from your history. Your baseline and current measurement stay unchanged.</p>
+  <p class="control-note" id="captureDeleteStatus" role="status" aria-live="polite"></p>
+  <div class="setup-dialog-actions">
+    <button class="action-button ghost" id="captureDeleteCancel" type="button" data-i18n="history.deleteCancel">Cancel</button>
+    <button class="action-button ghost capture-delete-button" id="captureDeleteConfirm" type="button" data-i18n="history.deleteConfirm">Delete</button>
   </div>
 </dialog>
 

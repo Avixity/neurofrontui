@@ -3,7 +3,7 @@
   const clone = value => value == null ? value : structuredClone(value)
   const uid = () => crypto.randomUUID()
   const featureKeys = ["mean", "rms", "stdDev", "peakToPeak", "derivativeMean"]
-  const buckets = new Map(), writes = new Map()
+  const buckets = new Map(), writes = new Map(), captureDeleteWork = new Map()
   const threadRevisions = new Map()
   let config = null, client = null, user = null, bucket = null, epoch = 0
   let loading = false, configured = false, error = "", conflict = false, guestAvailable = false
@@ -12,15 +12,35 @@
   const owner = () => user?.id || null
   const busy = () => window.NeuroFrontDevice?.busy() || false
   const current = (id, generation = epoch) => owner() === id && epoch === generation
-  const empty = id => ({ owner: id, profile: null, baselines: [], captures: [], threads: [], outbox: [] })
+  const empty = id => ({ owner: id, profile: null, baselines: [], captures: [], threads: [], outbox: [], deletedCaptures: [] })
   const fail = code => { const e = new Error(code); e.code = code; return e }
   const event = (name, detail) => document.dispatchEvent(new CustomEvent(name, { detail }))
   const snapshot = () => ({ user: user && { id: user.id, email: user.email },
     profile: bucket?.profile ? { ...clone(bucket.profile), avatarUrl } : null,
     baselines: clone(bucket?.baselines || []), captures: clone(bucket?.captures || []), threads: clone(bucket?.threads || []),
-    configured, loading, pending: bucket?.outbox.length || 0, error, conflict, guestAvailable, busy: busy(),
+    configured, loading, pending: bucket?.outbox.length || 0,
+    pendingCaptureDeletes: (bucket?.outbox || []).filter(op => op.type === "captureDelete" && op.durable !== false).map(op => op.recordId),
+    error, conflict, guestAvailable, busy: busy(),
     status: loading ? "loading" : conflict ? "conflict" : error ? "error" : bucket?.outbox.length ? "pending" : user ? "saved" : "guest" })
   function emit() { event("neurofront:accountchange", snapshot()) }
+  const captureDeleted = (active, id) => Boolean(active?.deletedCaptures?.includes(id))
+  const captureDeletePending = (active, id) => active.outbox.some(op => op.type === "captureDelete" && op.recordId === id)
+  function detachDeletedCaptures(thread, active) {
+    const value = clone(thread)
+    if (captureDeleted(active, value.capture_id)) value.capture_id = null
+    for (const message of value.messages || []) {
+      if (captureDeleted(active, message.captureId) || captureDeleted(active, message.capture?.id) || captureDeleted(active, message.retryJob?.captureId)) {
+        delete message.captureId; delete message.capture; delete message.retryJob
+      }
+    }
+    return value
+  }
+  function applyCaptureDeletions(active) {
+    active.captures = active.captures.filter(record => !captureDeleted(active, record.id))
+    active.threads = active.threads.map(thread => detachDeletedCaptures(thread, active))
+    active.outbox = active.outbox.filter(op => op.type !== "capture" || !captureDeleted(active, op.recordId))
+    for (const op of active.outbox) if (op.type === "thread") op.payload = detachDeletedCaptures(op.payload, active)
+  }
   function database() {
     if (!dbPromise) dbPromise = new Promise((resolve, reject) => {
       const request = indexedDB.open("neurofront-account-cache", 1)
@@ -41,11 +61,17 @@
         request.onerror = () => reject(request.error)
       })
       const result = value?.owner === id && Array.isArray(value.outbox) ? value : empty(id)
+      result.deletedCaptures ||= []
+      for (const op of result.outbox) if (op.type === "captureDelete") {
+        op.durable = true
+        if (!result.deletedCaptures.includes(op.recordId)) result.deletedCaptures.push(op.recordId)
+      }
+      applyCaptureDeletions(result)
       buckets.set(id, result)
       return result
     } catch { const result = empty(id); buckets.set(id, result); return result }
   }
-  function cache(value) {
+  function cache(value, strict = false) {
     const work = (writes.get(value.owner) || Promise.resolve()).catch(() => {}).then(async () => {
       const db = await database()
       return new Promise((resolve, reject) => {
@@ -57,7 +83,10 @@
       })
     })
     writes.set(value.owner, work)
-    return work.catch(() => { if (owner() === value.owner) { error = "storage"; emit() } })
+    return work.catch(() => {
+      if (owner() === value.owner) { error = "storage"; emit() }
+      if (strict) throw fail("storage")
+    })
   }
   async function accessToken(expected = owner()) {
     if (!client || !expected || owner() !== expected) throw fail("authentication")
@@ -72,7 +101,7 @@
       headers: { apikey: config.publishableKey, Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...options.headers } })
     let data = null
     try { data = await response.json() } catch {}
-    if (!response.ok) throw fail(data?.code === "40001" ? "conflict" : response.status === 401 ? "authentication" : "sync")
+    if (!response.ok) throw fail(data?.code === "40001" ? "conflict" : data?.code === "P0002" ? "captureDeleted" : response.status === 401 ? "authentication" : "sync")
     return data
   }
   const rpc = (name, data, id, signal) => cloud(`/rest/v1/rpc/${name}`, { method: "POST", body: JSON.stringify(data) }, id, signal)
@@ -140,8 +169,8 @@
         const profile = await rpc("nf_save_profile", { p_expected_revision: 0, p_display_name: String(user.user_metadata?.display_name || "").slice(0, 80), p_avatar_path: null, p_preferences: {}, p_active_baseline_id: null }, id, signal)
         profiles = [Array.isArray(profile) ? profile[0] : profile]
       }
-      const [baselines, captures, threads, messages] = await Promise.all([
-        rows("nf_baselines", id, signal), rows("nf_captures", id, signal), rows("nf_threads", id, signal), rows("nf_messages", id, signal)
+      const [baselines, captures, threads, messages, deletions] = await Promise.all([
+        rows("nf_baselines", id, signal), rows("nf_captures", id, signal), rows("nf_threads", id, signal), rows("nf_messages", id, signal), rows("nf_capture_deletions", id, signal)
       ])
       if (!current(id, generation)) return
       const pending = bucket.outbox
@@ -149,6 +178,7 @@
       bucket.baselines = baselines
       bucket.captures = captures.map(row => ({ ...row.payload, cloudSaved: true }))
       bucket.threads = threads.map(row => ({ ...row, messages: messages.filter(message => message.thread_id === row.id).sort((a, b) => a.ordinal - b.ordinal).map(message => ({ ...message.payload, id: message.id })) }))
+      bucket.deletedCaptures = [...new Set([...(bucket.deletedCaptures || []), ...deletions.map(row => row.id)])]
       for (const op of pending) {
         if (op.type === "baseline") put(bucket.baselines, { id: op.recordId, payload: op.payload })
         if (op.type === "capture") put(bucket.captures, { ...op.payload, cloudSaved: false })
@@ -158,6 +188,7 @@
           bucket.profile = { ...bucket.profile, ...op.payload }
         }
       }
+      applyCaptureDeletions(bucket)
       bucket.captures.sort((a, b) => b.completedAt.localeCompare(a.completedAt))
       applyPreferences()
       await loadAvatar(id, generation)
@@ -178,10 +209,12 @@
     const work = (async () => {
       while (current(id, generation) && active.outbox.length && !conflict) {
         const op = active.outbox[0]
+        if (op.durable === false) break
         try {
           let saved
           if (op.type === "baseline") saved = await rpc("nf_save_baseline", { p_id: op.recordId, p_payload: op.payload }, id, signal)
           if (op.type === "capture") saved = await rpc("nf_save_capture", { p_id: op.recordId, p_baseline_id: op.baselineId, p_payload: op.payload }, id, signal)
+          if (op.type === "captureDelete") saved = await rpc("nf_delete_capture", { p_id: op.recordId }, id, signal)
           if (op.type === "profile") saved = await rpc("nf_save_profile", { p_expected_revision: op.expectedRevision,
             p_display_name: op.payload.display_name || "", p_avatar_path: op.payload.avatar_path || null,
             p_preferences: op.payload.preferences || {}, p_active_baseline_id: op.payload.active_baseline_id || null }, id, signal)
@@ -193,6 +226,20 @@
           if (op.type === "capture") {
             const record = active.captures.find(row => row.id === op.recordId)
             if (record) record.cloudSaved = true
+          }
+          if (op.type === "captureDelete") {
+            for (const changed of saved?.affected_threads || []) {
+              const thread = active.threads.find(row => row.id === changed.id)
+              const previousRevision = thread?.revision
+              if (changed.revision !== previousRevision + 1) continue
+              thread.revision = changed.revision
+              for (const pending of active.outbox) if (pending.type === "thread" && pending.recordId === changed.id && pending.expectedRevision === previousRevision) {
+                pending.expectedRevision = changed.revision
+                pending.payload.revision = changed.revision
+              }
+              const known = threadRevisions.get(`${id}/${changed.id}`)
+              if (known?.revision === previousRevision) known.revision = changed.revision
+            }
           }
           if (op.type === "profile" || op.type === "thread") {
             const later = active.outbox.filter(entry => entry.type === op.type && entry.recordId === op.recordId)
@@ -210,6 +257,15 @@
           error = ""
           event("neurofront:accountrecords", { owner: id }); emit()
         } catch (e) {
+          if (op.type === "capture" && e.code === "captureDeleted") {
+            active.deletedCaptures ||= []
+            if (!active.deletedCaptures.includes(op.recordId)) active.deletedCaptures.push(op.recordId)
+            applyCaptureDeletions(active)
+            await cache(active)
+            if (!current(id, generation)) return
+            event("neurofront:accountrecords", { owner: id }); emit()
+            continue
+          }
           if (current(id, generation)) { error = e.code || "sync"; conflict = error === "conflict"; emit() }
           break
         }
@@ -263,13 +319,45 @@
     if (!window.NeuroFrontHistory.validCapture(record)) throw fail("capture")
     if (!expected || expected !== owner() || !bucket) throw fail("authentication")
     const active = bucket
+    if (captureDeleted(active, record.id) || captureDeletePending(active, record.id)) return record.id
     const baseline = await saveBaseline(baselineFromCapture(record), false, expected)
+    if (captureDeleted(active, record.id) || captureDeletePending(active, record.id)) return record.id
     if (!active.captures.some(row => row.id === record.id)) {
       put(active.captures, { ...clone(record), cloudSaved: false })
       queueOwned(active, { type: "capture", recordId: record.id, baselineId: baseline, payload: record })
       if (owner() === expected) event("neurofront:accountrecords", { owner: expected })
     }
     return record.id
+  }
+  async function deleteCapture(id, expected = owner()) {
+    if (!expected || expected !== owner() || !bucket) throw fail("authentication")
+    if (typeof id !== "string" || !/^[a-zA-Z0-9._:-]{1,100}$/.test(id)) throw fail("capture")
+    const active = bucket, key = `${expected}/${id}`
+    if (captureDeleteWork.has(key)) return captureDeleteWork.get(key)
+    if (captureDeleted(active, id)) {
+      await flush()
+      return { pending: captureDeletePending(active, id) }
+    }
+    if (!active.captures.some(record => record.id === id)) throw fail("capture")
+    const work = (async () => {
+      const op = { id: uid(), type: "captureDelete", recordId: id, durable: false }
+      active.outbox.push(op)
+      try { await cache(active, true) }
+      catch (e) { active.outbox = active.outbox.filter(entry => entry.id !== op.id); throw e }
+      op.durable = true
+      active.deletedCaptures ||= []
+      active.deletedCaptures.push(id)
+      applyCaptureDeletions(active)
+      if (owner() === expected) error = ""
+      await cache(active)
+      if (owner() === expected) {
+        event("neurofront:accountrecords", { owner: expected }); emit()
+        await flush()
+      }
+      return { pending: captureDeletePending(active, id) }
+    })()
+    captureDeleteWork.set(key, work)
+    try { return await work } finally { if (captureDeleteWork.get(key) === work) captureDeleteWork.delete(key) }
   }
   async function updateProfile(patch) {
     if (!bucket?.profile || !owner()) throw fail("authentication")
@@ -296,7 +384,7 @@
       known = { clientRevision: declared, revision: declared }
       threadRevisions.set(key, known)
     }
-    const value = { ...clone(thread), revision: known.revision, updated_at: new Date().toISOString() }
+    const value = { ...detachDeletedCaptures(thread, bucket), revision: known.revision, updated_at: new Date().toISOString() }
     put(bucket.threads, value)
     queue({ type: "thread", recordId: value.id, expectedRevision: value.revision, payload: value }, expected)
   }
@@ -441,7 +529,7 @@
   window.addEventListener("focus", () => { if (owner() && Date.now() - lastReload > 45000 && !bucket?.outbox.length) refresh() })
   window.NeuroFrontAccount = Object.freeze({ getState: snapshot, owner, isCurrent: id => owner() === id, accessToken, deviceBusy: emit,
     signIn, signUp, recover, updatePassword, signOut, updateProfile, setActiveBaseline, uploadAvatar,
-    saveBaseline, saveCapture, saveThread, importGuest, selectThread, reload: () => refresh(true),
+    saveBaseline, saveCapture, deleteCapture, saveThread, importGuest, selectThread, reload: () => refresh(true),
     retry: async () => { if (conflict) throw fail("conflict"); error = ""; await flush(); if (!bucket?.outbox.length) await refresh() },
     captureSaved: id => Boolean(bucket?.captures.find(record => record.id === id)?.cloudSaved) })
   initialize()

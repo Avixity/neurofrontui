@@ -1097,6 +1097,17 @@ button:focus-visible, a:focus-visible, .capture-plot-scroll:focus-visible {
 .capture-features dd { margin: 0; color: var(--text); font-variant-numeric: tabular-nums; }
 .capture-dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
 .capture-dialog-actions .action-button { width: auto; min-width: 160px; }
+.history-entry-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.history-delete-button svg { width: 18px; height: 18px; }
+.history-delete-button, .action-button.capture-delete-button { color: #f1a9b1; border-color: rgba(241, 169, 177, 0.25); }
+.history-delete-button:hover, .action-button.capture-delete-button:hover { background: rgba(241, 169, 177, 0.1); border-color: #f1a9b1; }
+.capture-dialog-actions .capture-delete-button { margin-inline-end: auto; }
+.capture-delete-dialog { width: min(440px, calc(100% - 24px)); }
+.capture-delete-dialog h2 { margin: 0 0 12px; font-size: 1.2rem; }
+.capture-delete-dialog p { line-height: 1.6; overflow-wrap: anywhere; }
+#captureDeleteDescription { color: var(--muted); margin: 16px 0; }
+#captureDeleteStatus:empty { display: none; }
+.history-entry-copy { min-width: 0; overflow-wrap: anywhere; }
 .resource-dialog { width: min(720px, calc(100% - 32px)); }
 .resource-dialog .setup-dialog-head { align-items: flex-start; }
 .resource-dialog h2 { line-height: 1.5; }

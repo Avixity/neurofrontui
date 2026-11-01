@@ -388,6 +388,23 @@
   ui.assistantPanel.addEventListener("keydown", event => { if (event.key === "Escape") { event.preventDefault(); minimize() } })
   ui.getMeasurementExplanation.addEventListener("click", () => explain(window.NeuroFrontHistory.getLatest()))
   document.addEventListener("neurofront:capture-completed", () => { ui.getMeasurementExplanation.hidden = false })
+  document.addEventListener("neurofront:capture-deleted", event => {
+    if (event.detail.owner !== owner()) return
+    const id = event.detail.id
+    if (!window.NeuroFrontHistory.getLatest()) ui.getMeasurementExplanation.hidden = true
+    if (selected?.id === id || retry?.capture?.id === id || retry?.captureId === id) {
+      generation++
+      request?.controller.abort()
+      request = null; selected = null; retry = null; statusKey = ""
+    }
+    for (const message of messages) {
+      if (message.capture?.id !== id && message.captureId !== id && message.retryJob?.captureId !== id) continue
+      message.content = messageText(message)
+      delete message.capture; delete message.captureId; delete message.job; delete message.retryJob
+      if (message.status === "pending") message.status = "stopped"
+    }
+    render()
+  })
   document.addEventListener("neurofront:accountreset", resetForAccount)
   document.addEventListener("neurofront:threadselect", event => restoreThread(event.detail?.thread, event.detail?.captures || account()?.getState()?.captures || []))
   document.addEventListener("neurofront:languagechange", () => {

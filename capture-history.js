@@ -6,7 +6,8 @@
     "historyList", "historyEmpty", "historyStatus", "historyRetry", "historyLoadMore",
     "captureDialog", "captureClose", "captureDate", "captureScore", "captureCategory",
     "captureActivity", "captureAverage", "capturePeak", "captureMinimum", "captureDuration",
-    "captureBaselineDate", "captureBaselineFeatures", "captureGraph", "captureBaselineGraph", "captureExport"
+    "captureBaselineDate", "captureBaselineFeatures", "captureGraph", "captureBaselineGraph", "captureExport",
+    "captureDelete", "captureDeleteDialog", "captureDeleteDate", "captureDeleteStatus", "captureDeleteCancel", "captureDeleteConfirm"
   ].map(id => [id, document.getElementById(id)]))
   const records = new Map()
   const pending = new Map()
@@ -24,6 +25,11 @@
   let scopeVersion = 0
   let visibleCount = PAGE_SIZE
   const guestPending = new Map()
+  const guestDeleted = new Set()
+  let deleteTarget = null
+  let deleteBusy = false
+  let deleteFailed = false
+  let historyNotice = ""
 
   const dictionary = () => window.NEUROFRONT_TRANSLATIONS[document.documentElement.lang] || window.NEUROFRONT_TRANSLATIONS.en
   const t = (key, values = {}) => (dictionary()[key] || window.NEUROFRONT_TRANSLATIONS.en[key] || key)
@@ -92,6 +98,20 @@
     })
   }
 
+  async function deleteGuestCapture(id) {
+    await saving.get(id)
+    const db = await openDatabase()
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE, "readwrite")
+      transaction.objectStore(STORE).delete(id)
+      transaction.oncomplete = resolve
+      transaction.onerror = () => reject(transaction.error)
+      transaction.onabort = () => reject(transaction.error || new Error("Storage interrupted"))
+    })
+    guestDeleted.add(id)
+    guestPending.delete(id)
+  }
+
   async function readPage(after) {
     const db = await openDatabase()
     return new Promise((resolve, reject) => {
@@ -144,7 +164,7 @@
         const result = await readPage(reset ? null : cursor)
         if (version !== scopeVersion) return
         if (reset) records.clear()
-        for (const record of result.page) { records.set(record.id, record); savedIds.add(record.id) }
+        for (const record of result.page) if (!guestDeleted.has(record.id)) { records.set(record.id, record); savedIds.add(record.id) }
         cursor = result.nextCursor
         hasMore = result.more
         readFailed = result.invalid
@@ -159,6 +179,7 @@
 
   function renderList() {
     const focusedId = document.activeElement?.dataset.captureId
+    const focusedDeleteId = document.activeElement?.dataset.deleteCaptureId
     const all = new Map(records)
     for (const [id, record] of pending) all.set(id, record)
     elements.historyList.replaceChildren()
@@ -192,7 +213,22 @@
       button.setAttribute("aria-haspopup", "dialog")
       button.setAttribute("aria-controls", "captureDialog")
       button.addEventListener("click", () => openCapture(record, button))
-      entry.append(content, button)
+      const remove = document.createElement("button")
+      remove.type = "button"
+      remove.className = "history-info-button history-delete-button"
+      remove.dataset.deleteCaptureId = record.id
+      remove.title = t("history.delete")
+      remove.setAttribute("aria-label", `${t("history.delete")}: ${formatDate(record.completedAt)}`)
+      remove.setAttribute("aria-haspopup", "dialog")
+      remove.setAttribute("aria-controls", "captureDeleteDialog")
+      const icon = svgNode("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": 1.6, "aria-hidden": true })
+      icon.append(svgNode("path", { d: "M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7M14 10v7" }))
+      remove.append(icon)
+      remove.addEventListener("click", () => requestDelete(record, remove))
+      const actions = document.createElement("div")
+      actions.className = "history-entry-actions"
+      actions.append(button, remove)
+      entry.append(content, actions)
       elements.historyList.append(entry)
     }
     elements.historyEmpty.hidden = all.size > 0 || readFailed || Boolean(loading)
@@ -203,10 +239,11 @@
     elements.historyRetry.hidden = !failedSaves && !readFailed
     elements.historyRetry.disabled = Boolean(saving.size || loading)
     const account = accountOwner ? window.NeuroFrontAccount?.getState() : null
-    const status = account ? account.conflict ? "account.error.conflict" : account.error ? "account.sync.error" : account.pending ? "account.sync.pending" : "" : failedSaves ? "history.saveFailed" : readFailed ? "history.loadFailed" : saving.size ? "history.saving" : loading ? "history.loading" : ""
+    const status = account ? account.conflict ? "account.error.conflict" : account.pendingCaptureDeletes?.length ? "history.deletePending" : account.error ? "account.sync.error" : account.pending ? "account.sync.pending" : historyNotice : failedSaves ? "history.saveFailed" : readFailed ? "history.loadFailed" : saving.size ? "history.saving" : loading ? "history.loading" : historyNotice
     elements.historyStatus.textContent = status ? t(status) : ""
-    if (focusedId && !elements.captureDialog.open) {
-      [...elements.historyList.querySelectorAll("button")].find(button => button.dataset.captureId === focusedId)?.focus({ preventScroll: true })
+    if (account?.pendingCaptureDeletes?.length) elements.historyRetry.hidden = false
+    if ((focusedId || focusedDeleteId) && !elements.captureDialog.open && !elements.captureDeleteDialog.open) {
+      [...elements.historyList.querySelectorAll("button")].find(button => focusedDeleteId ? button.dataset.deleteCaptureId === focusedDeleteId : button.dataset.captureId === focusedId)?.focus({ preventScroll: true })
     }
   }
 
@@ -234,7 +271,8 @@
   }
 
   function recordCapture(snapshot) {
-    if (!validCapture(snapshot) || savedIds.has(snapshot.id) || pending.has(snapshot.id)) return
+    if (!validCapture(snapshot) || savedIds.has(snapshot.id) || pending.has(snapshot.id) || (!accountOwner && guestDeleted.has(snapshot.id))) return
+    historyNotice = ""
     const record = copy(snapshot)
     latestCapture = record
     document.dispatchEvent(new CustomEvent("neurofront:capture-completed", { detail: { id: record.id } }))
@@ -325,6 +363,50 @@
     elements.captureClose.focus({ preventScroll: true })
   }
 
+  function renderDelete() {
+    if (!deleteTarget) return
+    elements.captureDeleteDate.textContent = t("history.deleteDate", { date: formatDate(deleteTarget.record.completedAt) })
+    elements.captureDeleteStatus.textContent = deleteBusy ? t("history.deleting") : deleteFailed ? t("history.deleteFailed") : ""
+    elements.captureDeleteConfirm.disabled = deleteBusy
+    elements.captureDeleteDialog.setAttribute("aria-busy", String(deleteBusy))
+  }
+
+  function requestDelete(record, button) {
+    if (deleteBusy) return
+    deleteTarget = { record: copy(record), button, owner: accountOwner, version: scopeVersion }
+    deleteFailed = false
+    renderDelete()
+    elements.captureDeleteDialog.showModal()
+    elements.captureDeleteCancel.focus({ preventScroll: true })
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget || deleteBusy) return
+    const target = deleteTarget
+    if (target.version !== scopeVersion || target.owner !== accountOwner) return
+    deleteBusy = true; deleteFailed = false; renderDelete()
+    try {
+      if (target.owner) await window.NeuroFrontAccount.deleteCapture(target.record.id, target.owner)
+      else await deleteGuestCapture(target.record.id)
+      if (target.version !== scopeVersion) return
+      records.delete(target.record.id); pending.delete(target.record.id); savedIds.delete(target.record.id)
+      if (latestCapture?.id === target.record.id) latestCapture = null
+      historyNotice = "history.deleted"
+      document.dispatchEvent(new CustomEvent("neurofront:capture-deleted", { detail: { id: target.record.id, owner: target.owner } }))
+      if (selected?.id === target.record.id) elements.captureDialog.close()
+      elements.captureDeleteDialog.close()
+      await loadPage(true)
+      if (target.version === scopeVersion && !elements.captureDialog.open && !elements.captureDeleteDialog.open) {
+        const next = elements.historyList.querySelector(".history-delete-button") || document.getElementById("historyTitle")
+        next.focus({ preventScroll: true })
+      }
+    } catch {
+      if (target.version === scopeVersion) { deleteFailed = true; historyNotice = "history.deleteFailed"; renderList() }
+    } finally {
+      if (target.version === scopeVersion) { deleteBusy = false; renderDelete() }
+    }
+  }
+
   function exportCapture() {
     if (!selected) return
     const record = selected
@@ -361,6 +443,23 @@
   })
   elements.captureClose.addEventListener("click", () => elements.captureDialog.close())
   elements.captureExport.addEventListener("click", exportCapture)
+  elements.captureDelete.addEventListener("click", () => { if (selected) requestDelete(selected, elements.captureDelete) })
+  elements.captureDeleteConfirm.addEventListener("click", confirmDelete)
+  elements.captureDeleteCancel.addEventListener("click", () => elements.captureDeleteDialog.close())
+  elements.captureDeleteDialog.addEventListener("keydown", event => {
+    if (event.key !== "Tab") return
+    const first = elements.captureDeleteCancel
+    const last = deleteBusy ? first : elements.captureDeleteConfirm
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+  })
+  elements.captureDeleteDialog.addEventListener("close", () => {
+    const target = deleteTarget
+    const replacement = [...elements.historyList.querySelectorAll(".history-delete-button")].find(button => button.dataset.deleteCaptureId === target?.record.id)
+    const focus = target?.button.isConnected ? target.button : replacement || document.getElementById("historyTitle")
+    if (target?.version === scopeVersion) focus?.focus({ preventScroll: true })
+    if (!deleteBusy) deleteTarget = null
+  })
   elements.captureDialog.addEventListener("keydown", event => {
     if (event.key !== "Tab") return
     const controls = [...elements.captureDialog.querySelectorAll('button:not(:disabled), [tabindex="0"]')]
@@ -380,7 +479,7 @@
     target?.focus({ preventScroll: true })
     selected = null
   })
-  document.addEventListener("neurofront:languagechange", () => { renderList(); renderCapture() })
+  document.addEventListener("neurofront:languagechange", () => { renderList(); renderCapture(); renderDelete() })
   async function readAssistantHistory(capture) {
     if (accountOwner) {
       const account = window.NeuroFrontAccount.getState()
@@ -428,6 +527,8 @@
   document.addEventListener("neurofront:accountreset", event => {
     scopeVersion++
     accountOwner = event.detail.nextOwner
+    elements.captureDeleteDialog.close()
+    deleteTarget = null; deleteBusy = false; deleteFailed = false; historyNotice = ""
     if (elements.captureDialog.open) elements.captureDialog.close()
     records.clear(); pending.clear(); saving.clear(); savedIds.clear()
     latestCapture = null; selected = null; cursor = null; hasMore = false; readFailed = false; loading = null; visibleCount = PAGE_SIZE

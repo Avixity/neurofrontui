@@ -11,9 +11,10 @@ const thread = { id: "00000000-0000-4000-8000-000000000001", title: "Explain thi
 const sdk = `window.supabase={createClient(){let session=JSON.parse(localStorage.getItem("simulated-auth")||"null"), listener=()=>{}; const emit=type=>listener(type,session); window.simulatedSwitch=id=>{session=id?{user:{id,email:id+"@example.test",user_metadata:{}},access_token:"token-"+id}:null;localStorage.setItem("simulated-auth",JSON.stringify(session));emit(id?"SIGNED_IN":"SIGNED_OUT")};return {auth:{onAuthStateChange(fn){listener=fn},async getSession(){return {data:{session},error:null}},async signInWithPassword({email}){simulatedSwitch(email.split("@")[0]);return {data:{session},error:null}},async signUp({email}){return {data:{session:null},error:null}},async signOut(){simulatedSwitch(null);return {error:null}},async resetPasswordForEmail(){return {error:null}},async updateUser(){return {error:null}}}}}}`
 
 ;(async () => {
-  const database = new Map(["a", "b"].map(id => [id, { profile: { id, revision: 1, display_name: id.toUpperCase(), avatar_path: null, preferences: { language: id === "a" ? "hi" : "en", resourcesExpanded: false }, active_baseline_id: null }, baselines: [], captures: [], threads: [], messages: [] }]))
+  const database = new Map(["a", "b"].map(id => [id, { profile: { id, revision: 1, display_name: id.toUpperCase(), avatar_path: null, preferences: { language: id === "a" ? "hi" : "en", resourcesExpanded: false }, active_baseline_id: null }, baselines: [], captures: [], threads: [], messages: [], capture_deletions: [] }]))
   const calls = []
   let offline = false
+  let heldCaptureSaveId = null, releaseCaptureSave = null
   const server = http.createServer((_request, response) => response.writeHead(200, { "Content-Type": "text/html" }).end('<!doctype html><html lang="en"><body></body></html>'))
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve))
   const url = `http://127.0.0.1:${server.address().port}`
@@ -44,10 +45,30 @@ const sdk = `window.supabase={createClient(){let session=JSON.parse(localStorage
         return respond(200, row)
       }
       if (name === "nf_save_capture") {
+        if (body.p_id === heldCaptureSaveId) await new Promise(resolve => { releaseCaptureSave = resolve })
+        if (db.capture_deletions.some(row => row.id === body.p_id)) return respond(404, { code: "P0002" })
         if (!db.baselines.some(row => row.id === body.p_baseline_id)) return respond(400, { code: "invalid_baseline" })
         let row = db.captures.find(row => row.id === body.p_id)
         if (!row) { row = { id: body.p_id, owner_id: id, baseline_id: body.p_baseline_id, payload: body.p_payload }; db.captures.push(row) }
         return respond(200, row)
+      }
+      if (name === "nf_delete_capture") {
+        let tombstone = db.capture_deletions.find(row => row.id === body.p_id)
+        if (!tombstone) { tombstone = { owner_id: id, id: body.p_id, deleted_at: new Date().toISOString() }; db.capture_deletions.push(tombstone) }
+        const affected = new Set(db.threads.filter(row => row.capture_id === body.p_id).map(row => row.id))
+        for (const message of db.messages) if (message.payload.captureId === body.p_id || message.payload.capture?.id === body.p_id || message.payload.retryJob?.captureId === body.p_id) {
+          affected.add(message.thread_id)
+          delete message.payload.captureId; delete message.payload.capture; delete message.payload.retryJob
+          message.capture_id = null
+        }
+        const affected_threads = []
+        for (const row of db.threads) if (affected.has(row.id)) {
+          if (row.capture_id === body.p_id) row.capture_id = null
+          row.revision++
+          affected_threads.push({ id: row.id, revision: row.revision })
+        }
+        db.captures = db.captures.filter(row => row.id !== body.p_id)
+        return respond(200, { id: body.p_id, deleted: true, deleted_at: tombstone.deleted_at, affected_threads })
       }
       if (name === "nf_save_thread") {
         const previous = db.threads.find(row => row.id === body.p_id)
@@ -187,7 +208,116 @@ const sdk = `window.supabase={createClient(){let session=JSON.parse(localStorage
     assert.equal(database.get("a").captures.length, 3)
     assert.equal(await page.evaluate(id => NeuroFrontAccount.getState().threads.find(row => row.id === id).messages.length, thread.id), 3)
     assert.deepEqual((await page.evaluate(() => NeuroFrontAccount.getState().captures)).find(item => item.id === capture.id).baseline, capture.baseline)
+
+    const preservedBaseline = structuredClone(database.get("a").baselines)
+    const activeBaseline = database.get("a").profile.active_baseline_id
+    const preservedMessages = database.get("a").messages.map(message => message.payload.content)
+    const originalResetCount = await page.evaluate(() => device.resetCount)
+    await page.evaluate(() => { device.active = true })
+    const deleted = await page.evaluate(id => NeuroFrontAccount.deleteCapture(id, "a"), capture.id)
+    assert.deepEqual(deleted, { pending: false })
+    assert.equal(database.get("a").captures.some(row => row.id === capture.id), false)
+    assert.equal(await page.evaluate(() => device.active), true, "Deleting a past capture must preserve the active capture")
+    assert.equal(await page.evaluate(() => device.resetCount), originalResetCount)
+    assert.deepEqual(database.get("a").baselines, preservedBaseline)
+    assert.equal(database.get("a").profile.active_baseline_id, activeBaseline)
+    assert.deepEqual(database.get("a").messages.map(message => message.payload.content), preservedMessages)
+    assert.ok(database.get("a").messages.every(message => !message.payload.captureId))
+    assert.ok(database.get("a").threads.every(row => !row.capture_id))
+    assert.equal(await page.evaluate(id => NeuroFrontAccount.captureSaved(id), capture.id), false)
+    await page.evaluate(() => { device.active = false })
+    const deleteCalls = calls.filter(call => call.path.endsWith("nf_delete_capture")).length
+    await page.evaluate(id => NeuroFrontAccount.deleteCapture(id, "a"), capture.id)
+    await page.evaluate(value => NeuroFrontAccount.saveCapture(value, "a"), capture)
+    assert.equal(calls.filter(call => call.path.endsWith("nf_delete_capture")).length, deleteCalls)
+    assert.equal(database.get("a").captures.some(row => row.id === capture.id), false, "Stale local saves cannot restore deleted records")
+    await assert.rejects(page.evaluate(() => NeuroFrontAccount.deleteCapture("capture-stable-2", "b")), /authentication/)
+    await assert.rejects(page.evaluate(() => NeuroFrontAccount.deleteCapture("other-owner-record", "a")), /capture/)
+
+    await page.evaluate(value => {
+      const saved = NeuroFrontAccount.getState().threads.find(row => row.id === value.id)
+      return NeuroFrontAccount.saveThread({ ...saved, capture_id: fixture.capture.id, messages: saved.messages.map(message => ({ ...message, captureId: fixture.capture.id })) }, "a")
+    }, thread)
+    await page.waitForFunction(() => NeuroFrontAccount.getState().status === "saved")
+    assert.equal(database.get("a").threads.find(row => row.id === thread.id).capture_id, null)
+    assert.ok(database.get("a").messages.every(message => !message.payload.captureId), "Stale conversation context must be sanitized")
+
+    offline = true
+    const deleteSecond = await page.evaluate(() => NeuroFrontAccount.deleteCapture("capture-stable-2", "a"))
+    assert.deepEqual(deleteSecond, { pending: true })
+    assert.deepEqual(await page.evaluate(() => NeuroFrontAccount.getState().pendingCaptureDeletes), ["capture-stable-2"])
+    assert.equal(await page.evaluate(() => NeuroFrontAccount.getState().captures.some(row => row.id === "capture-stable-2")), false)
+    assert.equal(database.get("a").captures.some(row => row.id === "capture-stable-2"), true)
+    await page.close()
+    page = await pageWithStore()
+    await page.waitForFunction(() => NeuroFrontAccount.getState().error && NeuroFrontAccount.getState().pendingCaptureDeletes.length === 1)
+    assert.equal(await page.evaluate(() => NeuroFrontAccount.getState().captures.some(row => row.id === "capture-stable-2")), false)
+    database.get("b").captures.push({ ...structuredClone(database.get("a").captures.find(row => row.id === "capture-stable-2")), owner_id: "b" })
+    await page.evaluate(() => NeuroFrontAccount.signIn("b@example.test", "synthetic-password"))
+    offline = false
+    await page.evaluate(() => NeuroFrontAccount.retry())
+    await page.waitForFunction(() => NeuroFrontAccount.owner() === "b" && NeuroFrontAccount.getState().status === "saved")
+    assert.equal(database.get("b").captures.length, 1)
+    assert.ok(!calls.some(call => call.id === "b" && call.path.endsWith("nf_delete_capture")), "A's pending deletion must not be sent as B")
+    await page.evaluate(() => NeuroFrontAccount.signIn("a@example.test", "synthetic-password"))
+    await page.waitForFunction(() => NeuroFrontAccount.getState().status === "saved" && !NeuroFrontAccount.getState().pendingCaptureDeletes.length)
+    assert.equal(database.get("a").captures.some(row => row.id === "capture-stable-2"), false)
+    assert.equal(database.get("b").captures.length, 1)
+
+    offline = true
+    const unsaved = { ...structuredClone(capture), id: "delete-before-upload" }
+    await page.evaluate(value => NeuroFrontAccount.saveCapture(value, "a"), unsaved)
+    await page.waitForFunction(() => NeuroFrontAccount.getState().error)
+    await page.evaluate(id => NeuroFrontAccount.deleteCapture(id, "a"), unsaved.id)
+    const callsBeforeRetry = calls.length
+    offline = false
+    await page.evaluate(() => NeuroFrontAccount.retry())
+    await page.waitForFunction(() => NeuroFrontAccount.getState().status === "saved")
+    assert.equal(database.get("a").captures.some(row => row.id === unsaved.id), false)
+    assert.ok(!calls.slice(callsBeforeRetry).some(call => call.path.endsWith("nf_save_capture") && call.body?.p_id === unsaved.id), "Queued create must be cancelled before deletion retry")
+
+    const racing = { ...structuredClone(capture), id: "delete-inflight-upload" }
+    heldCaptureSaveId = racing.id
+    await page.evaluate(value => NeuroFrontAccount.saveCapture(value, "a"), racing)
+    for (let attempt = 0; !releaseCaptureSave && attempt < 200; attempt++) await new Promise(resolve => setTimeout(resolve, 10))
+    assert.ok(releaseCaptureSave, "Synthetic capture upload must be held in flight")
+    assert.deepEqual(await page.evaluate(id => NeuroFrontAccount.deleteCapture(id, "a"), racing.id), { pending: true })
+    releaseCaptureSave(); heldCaptureSaveId = null
+    await page.waitForFunction(() => NeuroFrontAccount.getState().status === "saved")
+    assert.equal(database.get("a").captures.some(row => row.id === racing.id), false, "Delete must follow an already in-flight create")
+    assert.equal(await page.evaluate(id => NeuroFrontAccount.getState().captures.some(row => row.id === id), racing.id), false)
+
+    const staleRemote = { ...structuredClone(capture), id: "remote-tombstone" }
+    offline = true
+    await page.evaluate(value => NeuroFrontAccount.saveCapture(value, "a"), staleRemote)
+    await page.waitForFunction(() => NeuroFrontAccount.getState().error)
+    database.get("a").capture_deletions.push({ owner_id: "a", id: staleRemote.id, deleted_at: new Date().toISOString() })
+    offline = false
+    await page.evaluate(() => NeuroFrontAccount.retry())
+    await page.waitForFunction(() => NeuroFrontAccount.getState().status === "saved")
+    assert.equal(database.get("a").captures.some(row => row.id === staleRemote.id), false)
+    assert.equal(await page.evaluate(id => NeuroFrontAccount.getState().captures.some(row => row.id === id), staleRemote.id), false, "P0002 must discard a stale queued upload, not retry forever")
+
+    const cacheFailure = { ...structuredClone(capture), id: "delete-cache-failure" }
+    await page.evaluate(value => NeuroFrontAccount.saveCapture(value, "a"), cacheFailure)
+    await page.waitForFunction(() => NeuroFrontAccount.getState().status === "saved")
+    await page.evaluate(() => {
+      window.originalCachePut = IDBObjectStore.prototype.put
+      IDBObjectStore.prototype.put = function (value, ...args) {
+        if (value?.outbox?.some(op => op.type === "captureDelete" && op.recordId === "delete-cache-failure")) throw new DOMException("Synthetic quota failure", "QuotaExceededError")
+        return originalCachePut.call(this, value, ...args)
+      }
+    })
+    await assert.rejects(page.evaluate(id => NeuroFrontAccount.deleteCapture(id, "a"), cacheFailure.id), /storage/)
+    await page.evaluate(() => { IDBObjectStore.prototype.put = originalCachePut })
+    assert.equal(await page.evaluate(id => NeuroFrontAccount.getState().captures.some(row => row.id === id), cacheFailure.id), true, "Failed durable queue write must not hide the record")
+    assert.ok(database.get("a").captures.some(row => row.id === cacheFailure.id))
+    assert.ok(!calls.some(call => call.path.endsWith("nf_delete_capture") && call.body?.p_id === cacheFailure.id))
+    await page.evaluate(() => NeuroFrontAccount.retry())
+    await page.waitForFunction(() => NeuroFrontAccount.getState().status === "saved")
+    assert.deepEqual(database.get("a").baselines, preservedBaseline)
+    assert.equal(database.get("a").profile.active_baseline_id, activeBaseline)
     assert.deepEqual(errors, [])
-    console.log(JSON.stringify({ syntheticSupabaseAndRecords: true, deliberateIdempotentGuestImport: true, linkedBaselineAndExactSnapshot: true, duplicateSafeThreadRevisions: true, staleThreadPreservedAsSeparateConversation: true, offlineQueueSurvivesRefresh: true, retrySavesOnce: true, stalePreferencesConflict: true, independentBrowserContextRestoresCloudData: true, activeCaptureBlocksAccountAction: true, accountSwitchClearsChat: true, ownerScopedPendingUploads: true, restoredConversationsAndBaseline: true, errors }, null, 2))
+    console.log(JSON.stringify({ syntheticSupabaseAndRecords: true, deliberateIdempotentGuestImport: true, linkedBaselineAndExactSnapshot: true, duplicateSafeThreadRevisions: true, staleThreadPreservedAsSeparateConversation: true, offlineQueueSurvivesRefresh: true, retrySavesOnce: true, stalePreferencesConflict: true, independentBrowserContextRestoresCloudData: true, activeCaptureBlocksAccountAction: true, accountSwitchClearsChat: true, ownerScopedPendingUploads: true, restoredConversationsAndBaseline: true, accountCaptureDeletion: true, baselineAndActiveCapturePreserved: true, deletionDetachesChatWithoutErasingText: true, deleteOfflineRefreshAndOwnerIsolation: true, cancelledPendingCreate: true, deletionAfterInflightUpload: true, serverTombstoneRejectsStaleUpload: true, failedDeleteCacheKeepsRecordVisible: true, errors }, null, 2))
   } finally { await context.close(); await browser.close(); await new Promise(resolve => server.close(resolve)) }
 })().catch(error => { console.error(error); process.exitCode = 1 })
