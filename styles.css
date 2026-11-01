@@ -1275,7 +1275,7 @@ button:focus-visible, a:focus-visible, .capture-plot-scroll:focus-visible {
   gap: 10px;
   padding: 14px 14px 8px;
 }
-.assistant-avatar { width: 44px; height: 44px; flex: 0 0 44px; object-fit: contain; }
+.assistant-avatar { width: 44px; height: 44px; flex: 0 0 44px; object-fit: contain; border-radius: 50%; }
 .assistant-heading { flex: 1; min-width: 0; }
 .assistant-heading h2 { font-size: 0.98rem; line-height: 1.5; overflow-wrap: anywhere; }
 .assistant-heading p { margin-top: 2px; color: var(--muted); font-size: 0.75rem; }
