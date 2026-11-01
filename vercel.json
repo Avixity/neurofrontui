@@ -1,0 +1,31 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "builds": [
+    { "src": "assistant-api.js", "use": "@vercel/node", "config": { "includeFiles": ["resource-data.js"] } },
+    { "src": "index.html", "use": "@vercel/static" },
+    { "src": "styles.css", "use": "@vercel/static" },
+    { "src": "app.js", "use": "@vercel/static" },
+    { "src": "language.js", "use": "@vercel/static" },
+    { "src": "language-data.js", "use": "@vercel/static" },
+    { "src": "capture-language.js", "use": "@vercel/static" },
+    { "src": "capture-history.js", "use": "@vercel/static" },
+    { "src": "resource-data.js", "use": "@vercel/static" },
+    { "src": "resources.js", "use": "@vercel/static" },
+    { "src": "setup-viewer.js", "use": "@vercel/static" },
+    { "src": "score-config.js", "use": "@vercel/static" },
+    { "src": "assistant-language.js", "use": "@vercel/static" },
+    { "src": "assistant.js", "use": "@vercel/static" },
+    { "src": "assistant-avatar.webp", "use": "@vercel/static" },
+    { "src": "icon-512.png", "use": "@vercel/static" },
+    { "src": "image.png", "use": "@vercel/static" },
+    { "src": "NEUROFRONTLOGO.png", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/api/assistant", "dest": "/assistant-api.js" },
+    { "src": "/assistant-api(?:\\.js)?", "status": 404 },
+    { "src": "/", "dest": "/index.html" },
+    { "handle": "filesystem" },
+    { "src": "/.*", "status": 404 }
+  ]
+}

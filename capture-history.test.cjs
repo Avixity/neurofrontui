@@ -107,6 +107,7 @@ if (process.env.CHROMIUM_PATH) launch.executablePath = process.env.CHROMIUM_PATH
    await choose(code)
    assert.equal(await page.locator('#historyTitle').textContent(), await page.evaluate(code => NEUROFRONT_TRANSLATIONS[code]['history.title'], code))
    assert.equal(await page.locator('.resource-card').count(), 6)
+   if (await page.locator('#resourcesToggle').getAttribute('aria-expanded') === 'false') await page.locator('#resourcesToggle').click()
    await page.locator('.resource-read-more').first().click()
    assert.ok(await page.locator('#resourceDialogBody').textContent())
    assert.equal(await page.locator('#resourceDialogTitle').textContent(), await page.evaluate(code => NEUROFRONT_TRANSLATIONS[code]['resources.getting-started.title'], code))

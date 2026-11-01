@@ -18,6 +18,7 @@
   let hasMore = false
   let readFailed = false
   let selected = null
+  let latestCapture = null
   let returnFocus = null
 
   const dictionary = () => window.NEUROFRONT_TRANSLATIONS[document.documentElement.lang] || window.NEUROFRONT_TRANSLATIONS.en
@@ -208,6 +209,8 @@
   function recordCapture(snapshot) {
     if (!validCapture(snapshot) || savedIds.has(snapshot.id) || pending.has(snapshot.id)) return
     const record = copy(snapshot)
+    latestCapture = record
+    document.dispatchEvent(new CustomEvent("neurofront:capture-completed", { detail: { id: record.id } }))
     pending.set(record.id, record)
     persist(record).then(() => { if (savedIds.has(record.id)) loadPage(true) })
   }
@@ -341,6 +344,35 @@
     selected = null
   })
   document.addEventListener("neurofront:languagechange", () => { renderList(); renderCapture() })
-  window.NeuroFrontHistory = { record: recordCapture }
+  async function readAssistantHistory(capture) {
+    try {
+      const db = await openDatabase()
+      const previous = await new Promise((resolve, reject) => {
+        const result = []
+        const transaction = db.transaction(STORE, "readonly")
+        const range = IDBKeyRange.upperBound([capture.completedAt, ""], true)
+        const request = transaction.objectStore(STORE).index("completed").openCursor(range, "prev")
+        request.onsuccess = () => {
+          const item = request.result
+          if (!item) return
+          if (validCapture(item.value) && item.value.id !== capture.id) result.push(item.value)
+          if (result.length < 120) item.continue()
+        }
+        transaction.oncomplete = () => resolve(result)
+        transaction.onerror = () => reject(transaction.error)
+        transaction.onabort = () => reject(transaction.error)
+      })
+      const unique = new Map(previous.map(record => [record.id, record]))
+      for (const record of pending.values()) if (record.id !== capture.id && record.completedAt < capture.completedAt) unique.set(record.id, record)
+      return { previous: copy(sorted([...unique.values()]).slice(0, 120)), historyAvailable: true }
+    } catch { return { previous: [], historyAvailable: false } }
+  }
+  document.getElementById("captureExplain").addEventListener("click", () => {
+    if (!selected) return
+    const record = copy(selected)
+    elements.captureDialog.close()
+    window.NeuroFrontAssistant?.explain(record)
+  })
+  window.NeuroFrontHistory = Object.freeze({ record: recordCapture, getLatest: () => latestCapture && copy(latestCapture), readAssistantHistory })
   loadPage(true)
 })()

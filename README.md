@@ -5,10 +5,12 @@ The original HTML, CSS and JavaScript dashboard, with a state-based measurement 
 Run locally from this folder:
 
 ```sh
-python -m http.server 5180 --bind 127.0.0.1
+node local-server.cjs
 ```
 
 Open http://localhost:5180. The existing Chart.js CDN and Google Fonts links are retained.
+
+The floating NeuroFront Assistant explains completed captures using offline, translated score templates and matching saved history. Personalized conversation uses a read-only server endpoint. See [Assistant setup](ASSISTANT_SETUP.md) for Groq, production rate limiting, deployment and validation instructions. The dashboard remains usable without those services. Educational Resources start collapsed and remember their expanded state.
 
 Connect the device, then choose **Recalibrate** or **Use Saved Baseline**. Connecting alone does not start calibration. Recalibration keeps the active baseline intact until completion and can be cancelled. The circular timer shows a 20-second calibration window; the existing 400-sample requirement is retained, with up to five additional seconds for delayed samples before reporting failure. Measurement remains 15 seconds.
 

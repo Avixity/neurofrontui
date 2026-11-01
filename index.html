@@ -115,6 +115,7 @@
           <strong class="stress-label" id="stressLabel" data-i18n="baseline">Baseline</strong>
           <p class="metric-detail" id="stressFeedback" data-i18n="baseline.prepare">Connect and sit relaxed for 20 seconds to calibrate your session baseline.</p>
           <p class="baseline-note" id="baselineNote" data-i18n="baseline.target">Baseline target: 50/100</p>
+          <button class="text-button assistant-explain" id="getMeasurementExplanation" type="button" hidden aria-controls="assistantPanel" data-i18n="assistant.getMore">Get to know more</button>
         </div>
       </section>
 
@@ -203,16 +204,22 @@
       </section>
     </div>
     <section class="panel resources-panel" id="resourcesPanel" aria-labelledby="resourcesTitle">
-      <div class="panel-head">
-        <div>
-          <h2 id="resourcesTitle" data-i18n="resources.title">Educational Resources</h2>
-          <p class="section-caption" data-i18n="resources.subtitle">Practical guides to your device, signals and personal baseline.</p>
-        </div>
+      <h2 id="resourcesTitle">
+        <button class="resources-toggle" id="resourcesToggle" type="button" aria-expanded="false" aria-controls="resourcesContent">
+          <span data-i18n="resources.title">Educational Resources</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </h2>
+      <div id="resourcesContent" hidden>
+        <p class="section-caption resources-caption" data-i18n="resources.subtitle">Practical guides to your device, signals and personal baseline.</p>
+        <div class="resource-grid" id="resourceGrid"></div>
       </div>
-      <div class="resource-grid" id="resourceGrid"></div>
     </section>
   </main>
-  <p class="page-disclaimer" data-i18n="disclaimer">This should not be taken as a proper medical diagnosis.</p>
+  <footer class="page-footer">
+    <p class="page-disclaimer" data-i18n="disclaimer">This should not be taken as a proper medical diagnosis.</p>
+    <a href="https://neurofrontweb.vercel.app/" target="_blank" rel="noopener noreferrer" class="main-site-link"><span data-i18n="assistant.visit">Visit NeuroFront</span><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 12 12 4M5 4h7v7"/></svg></a>
+  </footer>
 </div>
 
 <dialog class="setup-dialog" id="setupImageDialog" aria-labelledby="setupDialogTitle">
@@ -282,7 +289,10 @@
     </figure>
     <dl class="capture-features" id="captureBaselineFeatures"></dl>
   </section>
-  <div class="capture-dialog-actions"><button class="action-button ghost" id="captureExport" type="button" data-i18n="export.png">Export PNG</button></div>
+  <div class="capture-dialog-actions">
+    <button class="action-button accent" id="captureExplain" type="button" aria-controls="assistantPanel" data-i18n="assistant.getMore">Get to know more</button>
+    <button class="action-button ghost" id="captureExport" type="button" data-i18n="export.png">Export PNG</button>
+  </div>
 </dialog>
 
 <dialog class="content-dialog resource-dialog" id="resourceDialog" aria-labelledby="resourceDialogTitle" aria-describedby="resourceDialogDescription">
@@ -300,14 +310,55 @@
   </section>
 </dialog>
 
+<section class="assistant-panel" id="assistantPanel" role="dialog" aria-modal="false" aria-labelledby="assistantTitle" hidden>
+  <header class="assistant-header">
+    <img class="assistant-avatar" src="assistant-avatar.webp" width="44" height="44" alt="">
+    <div class="assistant-heading">
+      <h2 id="assistantTitle" data-i18n="assistant.title">NeuroFront Assistant</h2>
+      <p data-i18n="assistant.ai">AI assistant</p>
+    </div>
+    <button class="assistant-icon-button" id="assistantClose" type="button" aria-label="Minimize assistant" data-i18n-aria-label="assistant.minimize">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 12h12"/></svg>
+    </button>
+  </header>
+  <div class="assistant-toolbar">
+    <button class="text-button" id="assistantNewChat" type="button" data-i18n="assistant.newChat">New Chat</button>
+  </div>
+  <div class="assistant-context" id="assistantContext" hidden>
+    <span id="assistantContextText"></span>
+    <button class="assistant-icon-button" id="assistantClearContext" type="button" aria-label="Clear selected capture" data-i18n-aria-label="assistant.clearContext">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m7 7 10 10M7 17 10-10"/></svg>
+    </button>
+  </div>
+  <div class="assistant-messages" id="assistantMessages" role="log" aria-live="polite" aria-relevant="additions text" tabindex="0"></div>
+  <div class="assistant-status-row">
+    <p id="assistantStatus" role="status"></p>
+    <button class="text-button" id="assistantRetry" type="button" hidden data-i18n="assistant.retry">Retry</button>
+  </div>
+  <form class="assistant-form" id="assistantForm">
+    <label class="assistant-input-label" for="assistantInput" data-i18n="assistant.message">Your message</label>
+    <textarea id="assistantInput" rows="2" maxlength="1200" autocomplete="off" placeholder="Ask about NeuroFront or your readings" data-i18n-placeholder="assistant.placeholder"></textarea>
+    <div class="assistant-compose-actions">
+      <button class="action-button ghost" id="assistantStop" type="button" hidden data-i18n="assistant.stop">Stop</button>
+      <button class="action-button accent" id="assistantSend" type="submit" data-i18n="assistant.send">Send</button>
+    </div>
+  </form>
+</section>
+<button class="assistant-launcher" id="assistantLauncher" type="button" aria-expanded="false" aria-controls="assistantPanel" aria-haspopup="dialog" aria-label="Open NeuroFront Assistant" data-i18n-aria-label="assistant.open">
+  <img src="assistant-avatar.webp" width="52" height="52" alt="">
+</button>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="language-data.js" defer></script>
 <script src="capture-language.js" defer></script>
 <script src="resource-data.js" defer></script>
+<script src="assistant-language.js" defer></script>
 <script src="language.js" defer></script>
+<script src="score-config.js" defer></script>
 <script src="app.js" defer></script>
 <script src="setup-viewer.js" defer></script>
 <script src="capture-history.js" defer></script>
 <script src="resources.js" defer></script>
+<script src="assistant.js" defer></script>
 </body>
 </html>

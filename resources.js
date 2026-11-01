@@ -8,10 +8,35 @@
   const body = document.getElementById("resourceDialogBody")
   const sources = document.getElementById("resourceSources")
   const closeButton = document.getElementById("resourceClose")
+  const toggle = document.getElementById("resourcesToggle")
+  const content = document.getElementById("resourcesContent")
+  const preferenceKey = "neurofront.resourcesExpanded"
   const articles = window.NEUROFRONT_RESOURCES || []
   const cards = []
   let selected = null
   let returnFocus = null
+
+  function setExpanded(expanded, persist = true) {
+    if (!toggle || !content) return
+    toggle.setAttribute("aria-expanded", String(expanded))
+    content.hidden = !expanded
+    if (persist) {
+      try { localStorage.setItem(preferenceKey, String(expanded)) } catch (_) { /* The current view remains usable without storage. */ }
+    }
+  }
+
+  function openArticle(id, origin = document.activeElement) {
+    const article = articles.find((entry) => entry.id === id)
+    if (!article) return false
+    setExpanded(true)
+    selected = article
+    returnFocus = origin
+    renderArticle()
+    if (!dialog.open) dialog.showModal()
+    dialog.scrollTop = 0
+    closeButton.focus({ preventScroll: true })
+    return true
+  }
 
   function translate(key) {
     const dictionaries = window.NEUROFRONT_TRANSLATIONS
@@ -57,14 +82,7 @@
     button.className = "resource-read-more action-button ghost"
     button.setAttribute("aria-haspopup", "dialog")
     button.setAttribute("aria-controls", "resourceDialog")
-    button.addEventListener("click", () => {
-      selected = article
-      returnFocus = button
-      renderArticle()
-      dialog.showModal()
-      dialog.scrollTop = 0
-      closeButton.focus({ preventScroll: true })
-    })
+    button.addEventListener("click", () => openArticle(article.id, button))
     card.append(heading, summary, button)
     cards.push({ article, heading, summary, button })
     grid.append(card)
@@ -101,8 +119,14 @@
     if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) dialog.close()
   })
   dialog.addEventListener("close", () => {
-    if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true })
+    if (returnFocus?.isConnected && returnFocus.getClientRects().length) returnFocus.focus({ preventScroll: true })
+    else toggle?.focus({ preventScroll: true })
   })
+  toggle?.addEventListener("click", () => setExpanded(toggle.getAttribute("aria-expanded") !== "true"))
+  let initiallyExpanded = false
+  try { initiallyExpanded = localStorage.getItem(preferenceKey) === "true" } catch (_) { /* Start collapsed when storage is unavailable. */ }
+  setExpanded(initiallyExpanded, false)
+  window.NeuroFrontResources = Object.freeze({ open: openArticle })
   document.addEventListener("neurofront:languagechange", refreshLanguage)
   refreshLanguage()
 })()

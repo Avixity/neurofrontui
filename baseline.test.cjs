@@ -7,6 +7,7 @@ function fixture(storage=new Map()) {
   const char=new EventTarget();char.startNotifications=async()=>{calls.notifications++;if(calls.notifications===1)throw Error('Simulated retry');return char}
   const device=new EventTarget();device.gatt={connected:false,async connect(){calls.connections++;this.connected=true;return this},disconnect(){calls.disconnects++;this.connected=false;device.dispatchEvent(new Event('gattserverdisconnected'))},async getPrimaryService(uuid){calls.service=uuid;return {async getCharacteristic(uuid){calls.characteristic=uuid;return char}}}}
   const context=vm.createContext({document:doc,window:{NeuroFrontI18n:{setText:(el,s)=>el.textContent=s,setMessage:(el,k,v)=>el.textContent=k+JSON.stringify(v)}},navigator:{bluetooth:{async requestDevice(opts){calls.requests++;calls.options=opts;return device}}},performance:{now:()=>clock.now},localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)},TextDecoder,Date,Intl,setTimeout,console})
+  vm.runInContext(fs.readFileSync(repo+'/score-config.js','utf8'),context)
   vm.runInContext(source,context)
   const evaluate=expr=>vm.runInContext(expr,context)
   function emit(value){char.value=new DataView(new TextEncoder().encode(`${value},36.5,4.0\0`).buffer);char.dispatchEvent(new Event('characteristicvaluechanged'))}

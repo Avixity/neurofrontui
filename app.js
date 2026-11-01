@@ -287,21 +287,7 @@ function refreshStressState(sampleWindow) {
   const currentActivity = compositeActivity(current)
   const relativeDelta = (currentActivity - baselineActivity) / baselineActivity
   const score = clamp(50 + relativeDelta * 38, 0, 100)
-  let label = "Balanced"
-  let feedback = "You appear close to your personal baseline."
-  if (score < 35) {
-    label = "Relaxed"
-    feedback = "You look relaxed relative to your session baseline."
-  } else if (score < 60) {
-    label = "Balanced"
-    feedback = "You appear close to your personal baseline."
-  } else if (score < 78) {
-    label = "Elevated"
-    feedback = "Stress appears mildly elevated. Consider a brief pause."
-  } else {
-    label = "High"
-    feedback = "Stress appears high. Slow down and take a short break."
-  }
+  const { label, feedback } = window.NeuroFrontScore.classify(score)
   state.stress.score = score
   state.stress.label = label
   state.stress.feedback = feedback
@@ -690,6 +676,7 @@ function startMeasurement() {
   resetLiveSessionState()
   state.measurement.active = true
   state.measurement.completed = false
+  window.NeuroFrontAssistant?.captureStarted()
   state.measurement.revealed = true
   state.measurement.startTime = performance.now()
   state.measurement.startedAt = new Date().toISOString()
