@@ -20,6 +20,9 @@ const refs = {
   sourceBadge: document.getElementById("sourceBadge"),
   leadState: document.getElementById("leadState"),
   signalValue: document.getElementById("signalValue"),
+  signalDiagnostics: document.getElementById("signalDiagnostics"),
+  signalReceiveStats: document.getElementById("signalReceiveStats"),
+  signalPacket: document.getElementById("signalPacket"),
   signalDetail: document.getElementById("signalDetail"),
   tempValue: document.getElementById("tempValue"),
   tempTrend: document.getElementById("tempTrend"),
@@ -93,10 +96,13 @@ const state = {
   flow: "baseline",
   bluetoothValue: IDLE_BASELINE,
   lastIncomingTime: 0,
+  signalInput: { received: 0, valid: 0, lastPacket: "", lastPacketValid: null, values: [], unchangedSince: 0, unchangedCount: 0 },
+  diagnosticsUpdatedAt: 0,
   device: null,
   characteristic: null,
   axisMin: -20,
   axisMax: 20,
+  axisHasData: false,
   measurement: {
     active: false,
     startTime: 0,
@@ -318,6 +324,7 @@ function resetLiveSessionState() {
   state.activity = 0
   state.axisMin = -20
   state.axisMax = 20
+  state.axisHasData = false
   state.temperature = DISCONNECTED_TEMPERATURE
   state.displayTemperature = DISCONNECTED_TEMPERATURE
   state.gsr = 0
@@ -588,7 +595,34 @@ function nextBluetoothValue(now) {
 }
 
 function hasFreshBluetoothSignal(now) {
-  return Boolean(state.lastIncomingTime && now - state.lastIncomingTime < SIGNAL_TIMEOUT_MS)
+  return Boolean(state.lastIncomingTime && state.signalInput.lastPacketValid !== false &&
+    now - state.lastIncomingTime < SIGNAL_TIMEOUT_MS &&
+    (!state.measurement.active || state.lastIncomingTime >= state.measurement.startTime))
+}
+
+function signalInputMessage(now) {
+  if (!isDeviceConnected()) return "signal.noLive"
+  if (!state.signalInput.received) return "signal.waitingData"
+  if (state.signalInput.lastPacketValid === false) return "signal.invalid"
+  if (!hasFreshBluetoothSignal(now)) return "signal.stopped"
+  if (state.signalInput.unchangedCount >= 20 && now - state.signalInput.unchangedSince >= 1500) return "signal.unchanged"
+  return null
+}
+
+function updateSignalDiagnostics(now) {
+  if (now - state.diagnosticsUpdatedAt < 250) return
+  state.diagnosticsUpdatedAt = now
+  refs.signalDiagnostics.hidden = !isDeviceConnected()
+  const input = state.signalInput
+  const min = input.values.length ? Math.min(...input.values) : null
+  const max = input.values.length ? Math.max(...input.values) : null
+  window.NeuroFrontI18n.setMessage(refs.signalReceiveStats, "signal.receiving", {
+    count: input.valid,
+    min: min === null ? "…" : String(min),
+    max: max === null ? "…" : String(max)
+  })
+  refs.signalPacket.hidden = !input.received
+  if (input.received) window.NeuroFrontI18n.setMessage(refs.signalPacket, "signal.packet", { packet: input.lastPacket })
 }
 
 function parseLeadOffFlag(rawLeadValue) {
@@ -628,8 +662,9 @@ function finalizeMeasurement() {
   const samples = state.measurement.samples.slice()
   state.flow = samples.length ? "complete" : "ready"
   state.exportSnapshot.buffer = samples.slice()
-  state.exportSnapshot.axisMin = state.axisMin
-  state.exportSnapshot.axisMax = state.axisMax
+  const bounds = samples.length ? signalBounds(samples) : { min: -20, max: 20 }
+  state.exportSnapshot.axisMin = bounds.min
+  state.exportSnapshot.axisMax = bounds.max
   if (!samples.length) {
     state.measurement.completed = false
     state.measurement.revealed = false
@@ -801,10 +836,16 @@ function updateReadouts() {
   state.displaySignal = lerp(state.displaySignal, state.liveValue, 0.16)
   state.displayTemperature = lerp(state.displayTemperature, state.temperature, 0.12)
   state.displayGsr = lerp(state.displayGsr, state.gsr, 0.12)
-  refs.signalValue.textContent = state.displaySignal.toFixed(1)
+  const signalSpan = state.axisMax - state.axisMin
+  refs.signalValue.textContent = formatSignalValue(state.displaySignal, signalSpan, 1)
   refs.tempValue.textContent = state.displayTemperature.toFixed(2)
   refs.gsrValue.textContent = state.displayGsr.toFixed(1)
-  window.NeuroFrontI18n.setText(refs.signalDetail, state.source === "bluetooth" ? "Live signal from NeuroFront" : "No live signal detected")
+  const inputMessage = signalInputMessage(performance.now())
+  if (inputMessage && isDeviceConnected()) {
+    window.NeuroFrontI18n.setMessage(refs.signalDetail, inputMessage, { value: String(state.bluetoothValue) })
+  } else {
+    window.NeuroFrontI18n.setText(refs.signalDetail, state.source === "bluetooth" ? "Live signal from NeuroFront" : "No live signal detected")
+  }
   
   // GSR classification
   if (state.status === "connected" && !state.measurement.active) {
@@ -828,6 +869,30 @@ function updateReadouts() {
   updateTrendLabel()
 }
 
+function formatSignalValue(value, span, minimumDecimals = 0) {
+  const decimals = Math.max(minimumDecimals, Math.ceil(-Math.log10(Math.max(span, 1e-12))) + 1)
+  if (decimals > 6) {
+    const precision = Math.min(14, Math.max(2, Math.ceil(Math.log10(Math.max(Math.abs(value), span) / span)) + 2))
+    return value.toExponential(precision)
+  }
+  return value.toFixed(decimals)
+}
+
+function signalBounds(samples) {
+  let min = Infinity
+  let max = -Infinity
+  for (const value of samples) {
+    if (value < min) min = value
+    if (value > max) max = value
+  }
+  const center = (min + max) / 2
+  const range = max - min
+  const span = range > 0
+    ? Math.max(range * 1.35, Math.abs(center) * Number.EPSILON * 16, 1e-9)
+    : Math.max(1, Math.abs(center) * 0.05)
+  return { min: center - span / 2, max: center + span / 2 }
+}
+
 function updateAxisLabels() {
   const axisSource = state.measurement.active
     ? state.measurement.samples
@@ -835,30 +900,29 @@ function updateAxisLabels() {
       ? state.exportSnapshot.buffer
       : []
   if (!axisSource.length) {
+    state.axisHasData = false
     state.axisMin = lerp(state.axisMin, -20, 0.18)
     state.axisMax = lerp(state.axisMax, 20, 0.18)
+  } else if (state.measurement.completed) {
+    state.axisMin = state.exportSnapshot.axisMin
+    state.axisMax = state.exportSnapshot.axisMax
+    state.axisHasData = true
   } else {
-    let min = Infinity
-    let max = -Infinity
-    for (const value of axisSource) {
-      if (value < min) {
-        min = value
-      }
-      if (value > max) {
-        max = value
-      }
+    const { min: targetMin, max: targetMax } = signalBounds(axisSource)
+    if (!state.axisHasData) {
+      state.axisMin = targetMin
+      state.axisMax = targetMax
+      state.axisHasData = true
+    } else {
+      state.axisMin = Math.min(targetMin, lerp(state.axisMin, targetMin, 0.18))
+      state.axisMax = Math.max(targetMax, lerp(state.axisMax, targetMax, 0.18))
     }
-    const center = (min + max) / 2
-    const span = Math.max(26, (max - min) * 1.35)
-    const targetMin = center - span / 2
-    const targetMax = center + span / 2
-    state.axisMin = lerp(state.axisMin, targetMin, 0.18)
-    state.axisMax = lerp(state.axisMax, targetMax, 0.18)
   }
   const mid = (state.axisMin + state.axisMax) / 2
-  refs.yAxisTop.textContent = `${state.axisMax.toFixed(0)}`
-  refs.yAxisMid.textContent = `${mid.toFixed(0)}`
-  refs.yAxisBottom.textContent = `${state.axisMin.toFixed(0)}`
+  const span = state.axisMax - state.axisMin
+  refs.yAxisTop.textContent = formatSignalValue(state.axisMax, span)
+  refs.yAxisMid.textContent = formatSignalValue(mid, span)
+  refs.yAxisBottom.textContent = formatSignalValue(state.axisMin, span)
   state.chart.options.scales.y.min = state.axisMin
   state.chart.options.scales.y.max = state.axisMax
 }
@@ -940,6 +1004,7 @@ function animationLoop(now) {
   updateSourceBadge(state.source)
   updateLeadState()
   updateReadouts()
+  updateSignalDiagnostics(now)
   refreshStressState(state.measurement.active ? state.measurement.samples : state.measurement.completed ? state.exportSnapshot.buffer : [])
   updateChartState(now)
   updateControlsAvailability(now)
@@ -958,7 +1023,7 @@ function drawExportChart(ctx, width, height, buffer, axisMin, axisMax, axisLabel
   const plotHeight = plotBottom - plotTop
   const safeMin = Number.isFinite(axisMin) ? axisMin : -20
   const safeMax = Number.isFinite(axisMax) ? axisMax : 20
-  const span = Math.max(1, safeMax - safeMin)
+  const span = safeMax > safeMin ? safeMax - safeMin : 1
   const mid = safeMin + span / 2
   const points = buffer.length ? buffer : [0]
 
@@ -994,9 +1059,9 @@ function drawExportChart(ctx, width, height, buffer, axisMin, axisMax, axisLabel
   ctx.font = "500 28px Inter, system-ui, sans-serif"
   ctx.textAlign = "right"
   ctx.textBaseline = "middle"
-  ctx.fillText(safeMax.toFixed(0), plotLeft - 22, plotTop + 14)
-  ctx.fillText(mid.toFixed(0), plotLeft - 22, plotTop + plotHeight / 2)
-  ctx.fillText(safeMin.toFixed(0), plotLeft - 22, plotBottom - 14)
+  ctx.fillText(formatSignalValue(safeMax, span), plotLeft - 22, plotTop + 14)
+  ctx.fillText(formatSignalValue(mid, span), plotLeft - 22, plotTop + plotHeight / 2)
+  ctx.fillText(formatSignalValue(safeMin, span), plotLeft - 22, plotBottom - 14)
 
   ctx.font = "500 24px Inter, system-ui, sans-serif"
   ctx.textAlign = "center"
@@ -1098,11 +1163,23 @@ function handleCharacteristic(event) {
   const parts = raw.split(",")
   const valueText = parts[0] ?? ""
   const parsedValue = Number.parseFloat(valueText)
-  state.lastIncomingTime = performance.now()
-  if (Number.isFinite(parsedValue)) {
-    state.bluetoothValue = parsedValue
-    captureBaselineSample(parsedValue)
+  const now = performance.now()
+  const input = state.signalInput
+  input.received += 1
+  input.lastPacket = JSON.stringify(raw.slice(0, 120))
+  input.lastPacketValid = Number.isFinite(parsedValue)
+  if (!input.lastPacketValid) return
+  if (!input.valid || parsedValue !== state.bluetoothValue) {
+    input.unchangedSince = now
+    input.unchangedCount = 0
   }
+  input.valid += 1
+  input.unchangedCount += 1
+  input.values.push(parsedValue)
+  if (input.values.length > 100) input.values.shift()
+  state.lastIncomingTime = now
+  state.bluetoothValue = parsedValue
+  captureBaselineSample(parsedValue)
   state.leadOff = false
   setStatus("connected")
 }
@@ -1129,6 +1206,8 @@ async function connectBluetooth() {
     return
   }
   refs.connectButton.disabled = true
+  state.lastIncomingTime = 0
+  state.signalInput = { received: 0, valid: 0, lastPacket: "", lastPacketValid: null, values: [], unchangedSince: 0, unchangedCount: 0 }
   window.NeuroFrontI18n.setText(refs.connectButton, "Connecting...")
   setStatus("connecting")
   try {

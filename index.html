@@ -89,6 +89,11 @@
             <span class="metric-unit">uV</span>
           </div>
           <p class="metric-detail" id="signalDetail" data-i18n="signal.noLive">No live signal detected</p>
+          <details class="signal-diagnostics" id="signalDiagnostics" hidden>
+            <summary data-i18n="signal.diagnostics">Signal diagnostics</summary>
+            <p id="signalReceiveStats"></p>
+            <p id="signalPacket" hidden></p>
+          </details>
         </div>
         <div class="metric-card">
           <span class="metric-label" data-i18n="temperature">Temperature</span>

@@ -528,6 +528,25 @@ h2 {
   font-weight: 700;
 }
 
+.signal-diagnostics {
+  grid-column: 1 / -1;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.signal-diagnostics summary {
+  cursor: pointer;
+  padding: 6px 0;
+  width: fit-content;
+}
+.signal-diagnostics summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.signal-diagnostics p { margin: 6px 0 0; overflow-wrap: anywhere; }
+
 .metric-unit {
   font-size: 1rem;
   color: rgba(223, 232, 241, 0.78);

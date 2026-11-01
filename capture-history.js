@@ -263,12 +263,12 @@
     svg.setAttribute("viewBox", "0 0 720 300")
     svg.setAttribute("aria-label", t(reference ? "history.reference" : "history.graph"))
     const left = 62, top = 28, width = 630, height = 204
-    const span = Math.max(1, maximum - minimum)
+    const span = maximum > minimum ? maximum - minimum : 1
     const count = Math.max(1, durationMs / intervalMs - 1)
     for (let index = 0; index < 3; index++) {
       const y = top + height * index / 2
       svg.append(svgNode("line", { x1: left, x2: left + width, y1: y, y2: y, stroke: "currentColor", opacity: 0.15 }))
-      svg.append(svgNode("text", { x: left - 12, y: y + 5, "text-anchor": "end", fill: "currentColor", "font-size": 14 }, (maximum - span * index / 2).toFixed(1)))
+      svg.append(svgNode("text", { x: left - 12, y: y + 5, "text-anchor": "end", fill: "currentColor", "font-size": 14 }, formatSignalValue(maximum - span * index / 2, span, 1)))
     }
     for (let index = 0; index < 4; index++) {
       svg.append(svgNode("text", { x: left + width * index / 3, y: top + height + 26, "text-anchor": "middle", fill: "currentColor", "font-size": 14 }, `${(durationMs / 1000 * index / 3).toFixed(0)}s`))
