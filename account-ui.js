@@ -85,6 +85,27 @@
   let renderedUser = null
   let lastThreadSignature = ""
   let lastBaselineSignature = ""
+  let greetingTimer
+
+  function renderGreeting(current = state()) {
+    clearTimeout(greetingTimer)
+    const greeting = byId("accountGreeting")
+    if (!greeting) return
+    greeting.hidden = !current.user
+    if (!current.user) { greeting.textContent = ""; return }
+    const name = String(current.profile?.display_name || "").trim()
+    const now = new Date()
+    const hour = now.getHours()
+    const period = hour >= 5 && hour < 12 ? "Morning" : hour >= 12 && hour < 17 ? "Afternoon" : "Evening"
+    const label = text(`account.greeting${period}${name ? "" : "Generic"}`, { name })
+    if (greeting.textContent !== label) greeting.textContent = label
+    greeting.dir = locale() === "ur" ? "rtl" : "ltr"
+    if (document.hidden) return
+    const next = new Date(now)
+    next.setHours(hour < 5 ? 5 : hour < 12 ? 12 : hour < 17 ? 17 : 5, 0, 0, 0)
+    if (hour >= 17) next.setDate(next.getDate() + 1)
+    greetingTimer = setTimeout(() => renderGreeting(), next.getTime() - now.getTime() + 100)
+  }
 
   function errorCode(error) {
     const code = String(error?.code || error?.message || "generic").replace(/^account\.error\./, "")
@@ -140,6 +161,7 @@
     const current = state()
     const user = current.user
     const profile = current.profile || {}
+    renderGreeting(current)
     const locked = working || current.loading || current.busy
     const pending = Array.isArray(current.pending) ? current.pending.length : Number(current.pending || 0)
     const privateView = Boolean(user) && mode !== "reset"
@@ -371,6 +393,8 @@
   })
   document.addEventListener("neurofront:accountchange", render)
   document.addEventListener("neurofront:languagechange", render)
+  document.addEventListener("visibilitychange", () => renderGreeting())
+  window.addEventListener("focus", () => renderGreeting())
   document.addEventListener("neurofront:accountrecovery", () => { feedback(); open("reset") })
   document.addEventListener("neurofront:accountverification", () => { feedback("account.verified"); open() })
   document.addEventListener("neurofront:accountcallbackerror", () => { mode = "signin"; feedback("account.error.recovery", true); open() })

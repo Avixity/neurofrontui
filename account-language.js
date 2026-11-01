@@ -89,4 +89,26 @@
     or: "ସ୍ଥାନୀୟ କଥାବାର୍ତ୍ତା ରହିବ।", as: "স্থানীয় কথোপকথন ৰখা হয়।", ur: "مقامی گفتگو برقرار رہتی ہے۔"
   }
   for (const [locale, sentence] of Object.entries(retainedChats)) window.NEUROFRONT_TRANSLATIONS[locale]["account.conflict"] += ` ${sentence}`
+  const greetings = {
+    en: ["Good morning", "Good afternoon", "Good evening"],
+    hi: ["सुप्रभात", "शुभ दोपहर", "शुभ संध्या"],
+    mr: ["सुप्रभात", "शुभ दुपार", "शुभ संध्याकाळ"],
+    bn: ["সুপ্রভাত", "শুভ অপরাহ্ণ", "শুভ সন্ধ্যা"],
+    ta: ["காலை வணக்கம்", "மதிய வணக்கம்", "மாலை வணக்கம்"],
+    te: ["శుభోదయం", "శుభ మధ్యాహ్నం", "శుభ సాయంత్రం"],
+    kn: ["ಶುಭೋದಯ", "ಶುಭ ಮಧ್ಯಾಹ್ನ", "ಶುಭ ಸಂಜೆ"],
+    ml: ["സുപ്രഭാതം", "ശുഭ മധ്യാഹ്നം", "ശുഭ സായാഹ്നം"],
+    gu: ["સુપ્રભાત", "શુભ બપોર", "શુભ સાંજ"],
+    pa: ["ਸ਼ੁਭ ਸਵੇਰ", "ਸ਼ੁਭ ਦੁਪਹਿਰ", "ਸ਼ੁਭ ਸ਼ਾਮ"],
+    or: ["ସୁପ୍ରଭାତ", "ଶୁଭ ଅପରାହ୍ଣ", "ଶୁଭ ସନ୍ଧ୍ୟା"],
+    as: ["সুপ্ৰভাত", "শুভ অপৰাহ্ণ", "শুভ সন্ধিয়া"],
+    ur: ["صبح بخیر", "دوپہر بخیر", "شام بخیر"]
+  }
+  for (const [locale, labels] of Object.entries(greetings)) {
+    const dictionary = window.NEUROFRONT_TRANSLATIONS[locale]
+    ;["Morning", "Afternoon", "Evening"].forEach((period, index) => {
+      dictionary[`account.greeting${period}`] = `${labels[index]}${locale === "ur" ? "،" : ","} {name}`
+      dictionary[`account.greeting${period}Generic`] = labels[index]
+    })
+  }
 })()

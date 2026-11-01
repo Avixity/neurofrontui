@@ -105,6 +105,18 @@ canvas {
   display: flex;
   align-items: center;
   gap: 14px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.brand-block > div { min-width: 0; }
+.account-greeting {
+  margin: 8px 0 0;
+  max-inline-size: 40ch;
+  color: var(--text);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .brand-assets {
