@@ -115,12 +115,39 @@ test("literal numbers are accepted only as exact approved values, including loca
 })
 
 test("missing optional resource actions become an empty list and score bounds remain approved facts", () => {
-  const facts = buildFacts(body(), null)
+  const selectedContext = context()
+  const facts = buildFacts(body("Explain", selectedContext), scores.compareCaptures(selectedContext.selected, selectedContext.previous))
   assert.deepEqual(validateOutput({ paragraphs: ["The scale runs from 0 to 100."] }, facts), { paragraphs: ["The scale runs from 0 to 100."], resourceIds: [] })
   assert.throws(() => validateOutput({ paragraphs: ["Review the guide."], resourceIds: null }, facts), /unavailable/)
   assert.throws(() => validateOutput({ paragraphs: ["Review the guide."], secret: "extra" }, facts), /unavailable/)
   assert.equal(validateOutput({ paragraphs: ["Your score is {{score}}/100."] }, { score: "80/100" }).paragraphs[0], "Your score is 80/100.")
   assert.throws(() => validateOutput({ paragraphs: ["Your score is {{score}}/1000."] }, { score: "80/100" }), /unavailable/)
+  assert.deepEqual(validateOutput({ paragraphs: ["Read the guide.", ""] }, {}), { paragraphs: ["Read the guide."], resourceIds: [] })
+  assert.throws(() => validateOutput({ paragraphs: [""] }, {}), /unavailable/)
+  assert.throws(() => validateOutput({ paragraphs: ["Read the guide.", null] }, {}), /unavailable/)
+})
+
+test("generic graph questions cannot borrow score-range or midpoint numeric facts", () => {
+  const facts = buildFacts(body("How should I read the graph?"), null)
+  assert.equal(Object.hasOwn(facts, "scaleMaximum"), false)
+  assert.equal(Object.hasOwn(facts, "midpoint"), false)
+  for (const paragraph of ["The graph runs from 0 to 100.", "The graph midpoint is 50/100.", "The graph midpoint is {{midpoint}}."]) {
+    assert.throws(() => validateOutput({ paragraphs: [paragraph], resourceIds: [] }, facts), /unavailable/)
+  }
+  assert.equal(validateOutput({ paragraphs: ["The trace shows electrical microvolts with an automatically changing vertical range. Calibration records a reference and does not filter noise."] }, facts).resourceIds.length, 0)
+})
+
+test("generation and review receive distinct graph units and reference-only calibration facts", async () => {
+  const provider = mockProvider([{ allowed: true }, { paragraphs: ["Calibration reduces noise in the electrical graph."], resourceIds: [] }, { safe: true, grounded: false, languageMatched: true }])
+  const result = await invoke(createHandler({ env: { GROQ_API_KEY: "test-secret" }, fetch: provider.fetch }), body("How should I read the graph?"))
+  assert.equal(result.statusCode, 503)
+  for (const request of provider.requests.slice(1)) {
+    const supplied = JSON.parse(request.messages.at(-1).content)
+    assert.match(supplied.projectFacts.primaryGraph.unit, /microvolts/)
+    assert.match(supplied.projectFacts.primaryGraph.verticalAxis, /Dynamically/)
+    assert.match(supplied.projectFacts.calibration.limitations, /Does not filter/)
+    assert.match(request.messages[0].content, /Calibration|calibration/)
+  }
 })
 
 test("provider JSON-validation errors get one bounded JSON-object fallback without bypassing local checks", async () => {

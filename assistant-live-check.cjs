@@ -20,6 +20,7 @@ const context = {
 }
 const cases = {
   english: { language: "en", question: "How do I prepare for my first NeuroFront measurement?" },
+  graph: { language: "en", question: "How should I read the NeuroFront graph, and what can cause a noisy trace?" },
   hindi: { language: "hi", question: "मेरी व्यक्तिगत बेसलाइन का क्या मतलब है?" },
   urdu: { language: "ur", question: "پیمائش سے پہلے الیکٹروڈ کیسے لگاؤں؟" },
   hinglish: { language: "hi", question: "Meri baseline kya hoti hai aur recalibrate kab karun?" },
