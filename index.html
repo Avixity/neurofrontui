@@ -122,41 +122,22 @@
       <section class="panel controls-panel">
         <div class="button-group">
           <button id="connectButton" class="action-button primary" data-i18n="device.connect">Connect</button>
-          <div class="baseline-buttons">
-            <button id="recalibrateButton" class="action-button ghost" disabled data-i18n="baseline.recalibrate">Recalibrate</button>
-            <button id="savedBaselineButton" class="action-button ghost" disabled data-i18n="baseline.useSaved">Use Saved Baseline</button>
+          <div class="session-action-area">
+            <div class="baseline-buttons" id="baselineChoices">
+              <button id="recalibrateButton" class="action-button ghost" disabled data-i18n="baseline.recalibrate">Recalibrate</button>
+              <button id="savedBaselineButton" class="action-button ghost" disabled data-i18n="baseline.useSaved">Use Saved Baseline</button>
+            </div>
+            <button id="calibrationProgressButton" class="action-button accent" disabled hidden data-i18n="baseline.progressButton">Calibrating…</button>
+            <button id="measureButton" class="action-button accent" disabled hidden aria-haspopup="dialog" aria-controls="setupImageDialog" data-i18n="measurement.start">Start Measurement</button>
+            <div class="measurement-buttons" id="completedActions" hidden>
+              <button id="measureAgainButton" class="action-button accent" data-i18n="measurement.again">Measure Again</button>
+              <button id="exportButton" class="action-button ghost" data-i18n="export.png">Export PNG</button>
+            </div>
           </div>
           <p class="control-note" id="savedBaselineInfo" data-i18n="baseline.noSaved">No saved baseline yet.</p>
-          <div class="measurement-buttons">
-            <button id="measureButton" class="action-button accent" disabled data-i18n="measurement.start">Start Measurement</button>
-            <button id="cancelCalibrationButton" class="action-button ghost" hidden data-i18n="baseline.cancel">Cancel calibration</button>
-            <button id="exportButton" class="action-button ghost" data-i18n="export.png">Export PNG</button>
-          </div>
+          <button id="cancelCalibrationButton" class="text-button" hidden data-i18n="baseline.cancel">Cancel calibration</button>
         </div>
         <p class="control-note control-status" id="baselineActionStatus" role="status" aria-live="polite"></p>
-      </section>
-      <section class="panel setup-panel">
-        <div class="panel-head compact">
-          <div>
-            <p class="eyebrow" data-i18n="setup.electrodes">Electrode Placement</p>
-            <h2 data-i18n="setup.guide">Setup Guide</h2>
-          </div>
-          <button class="setup-image-button" id="setupImageButton" type="button" aria-haspopup="dialog" aria-controls="setupImageDialog" aria-label="Enlarge setup illustration" data-i18n-aria-label="setup.enlarge">
-            <img class="setup-image" src="image.png" alt="Electrode placement guide" data-i18n-alt="setup.image">
-            <svg class="setup-expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg>
-          </button>
-        </div>
-        <div class="setup-card">
-
-          <div class="setup-copy">
-            <p class="setup-text"><strong data-i18n="setup.placement">Placement:</strong> <span data-i18n="setup.position">Red on right, yellow on left, green on earlobe or side of neck.</span></p>
-            <ul class="setup-list">
-              <li data-i18n="setup.peel">Peel each electrode off slowly so the conductive gel stays intact.</li>
-              <li data-i18n="setup.clean">Wipe the skin first and let it dry before applying the pads.</li>
-              <li data-i18n="setup.press">Press each electrode down for a few seconds to improve contact.</li>
-            </ul>
-          </div>
-        </div>
       </section>
     </div>
     <section class="panel timer-panel">
@@ -207,10 +188,29 @@
 
 <dialog class="setup-dialog" id="setupImageDialog" aria-labelledby="setupDialogTitle">
   <div class="setup-dialog-head">
-    <h2 id="setupDialogTitle" data-i18n="setup.guide">Setup Guide</h2>
-    <button class="setup-dialog-close action-button ghost" id="setupImageClose" type="button" data-i18n="setup.close">Close illustration</button>
+    <div>
+      <p class="eyebrow" data-i18n="setup.electrodes">Electrode Placement</p>
+      <h2 id="setupDialogTitle" data-i18n="setup.guide">Setup Guide</h2>
+    </div>
+    <button class="setup-dialog-close action-button ghost" id="setupImageClose" type="button" aria-label="Close" data-i18n-aria-label="common.close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg>
+    </button>
   </div>
-  <img src="image.png" alt="Electrode placement guide" data-i18n-alt="setup.image">
+  <div class="setup-dialog-content">
+    <img class="setup-illustration" src="image.png" alt="Electrode placement guide" data-i18n-alt="setup.image">
+    <div class="setup-copy">
+      <p class="setup-text"><strong data-i18n="setup.placement">Placement:</strong> <span data-i18n="setup.position">Red on right, yellow on left, green on earlobe or side of neck.</span></p>
+      <ul class="setup-list">
+        <li data-i18n="setup.peel">Peel each electrode off slowly so the conductive gel stays intact.</li>
+        <li data-i18n="setup.clean">Wipe the skin first and let it dry before applying the pads.</li>
+        <li data-i18n="setup.press">Press each electrode down for a few seconds to improve contact.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="setup-dialog-actions">
+    <button class="action-button ghost" id="cancelMeasurementButton" type="button" data-i18n="common.cancel">Cancel</button>
+    <button class="action-button accent" id="beginMeasurementButton" type="button" data-i18n="measurement.begin">Begin Measurement</button>
+  </div>
 </dialog>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

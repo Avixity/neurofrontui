@@ -1,5 +1,11 @@
 window.NEUROFRONT_TRANSLATIONS = {
   "en": {
+    "baseline.progressButton": "Calibrating…",
+    "measurement.measuring": "Measuring…",
+    "measurement.again": "Measure Again",
+    "measurement.begin": "Begin Measurement",
+    "common.cancel": "Cancel",
+    "common.close": "Close",
     "language": "Language",
     "brand.eyebrow": "Biosignal Monitoring Interface",
     "signal.feed": "Live Signal Feed",
@@ -102,6 +108,12 @@ window.NEUROFRONT_TRANSLATIONS = {
     "baseline.storageUnavailable": "Saved baselines are unavailable in this browser. You can still recalibrate."
   },
   "hi": {
+    "baseline.progressButton": "कैलिब्रेशन जारी है…",
+    "measurement.measuring": "मापन जारी है…",
+    "measurement.again": "फिर से मापें",
+    "measurement.begin": "मापन शुरू करें",
+    "common.cancel": "रद्द करें",
+    "common.close": "बंद करें",
     "language": "भाषा",
     "brand.eyebrow": "जैविक संकेत निगरानी इंटरफ़ेस",
     "signal.feed": "लाइव संकेत",
@@ -204,6 +216,12 @@ window.NEUROFRONT_TRANSLATIONS = {
     "baseline.storageUnavailable": "इस ब्राउज़र में सहेजी गई आधार रेखाएँ उपलब्ध नहीं हैं। आप फिर भी कैलिब्रेट कर सकते हैं।"
   },
   "mr": {
+    "baseline.progressButton": "कॅलिब्रेशन सुरू आहे…",
+    "measurement.measuring": "मापन सुरू आहे…",
+    "measurement.again": "पुन्हा मापन करा",
+    "measurement.begin": "मापन सुरू करा",
+    "common.cancel": "रद्द करा",
+    "common.close": "बंद करा",
     "language": "भाषा",
     "brand.eyebrow": "जैविक संकेत निरीक्षण इंटरफेस",
     "signal.feed": "थेट संकेत",
@@ -306,6 +324,12 @@ window.NEUROFRONT_TRANSLATIONS = {
     "baseline.storageUnavailable": "या ब्राउझरमध्ये जतन केलेल्या आधाररेषा उपलब्ध नाहीत. तुम्ही तरीही पुन्हा कॅलिब्रेट करू शकता."
   },
   "bn": {
+    "baseline.progressButton": "ক্যালিব্রেশন চলছে…",
+    "measurement.measuring": "পরিমাপ চলছে…",
+    "measurement.again": "আবার পরিমাপ করুন",
+    "measurement.begin": "পরিমাপ শুরু করুন",
+    "common.cancel": "বাতিল করুন",
+    "common.close": "বন্ধ করুন",
     "language": "ভাষা",
     "brand.eyebrow": "জৈব সংকেত পর্যবেক্ষণ ইন্টারফেস",
     "signal.feed": "সরাসরি সংকেত",
@@ -408,6 +432,12 @@ window.NEUROFRONT_TRANSLATIONS = {
     "baseline.storageUnavailable": "এই ব্রাউজারে সংরক্ষিত মূলরেখা পাওয়া যাচ্ছে না। আপনি এখনও আবার ক্যালিব্রেট করতে পারেন।"
   },
   "gu": {
+    "baseline.progressButton": "કેલિબ્રેશન ચાલુ છે…",
+    "measurement.measuring": "માપન ચાલુ છે…",
+    "measurement.again": "ફરી માપો",
+    "measurement.begin": "માપન શરૂ કરો",
+    "common.cancel": "રદ કરો",
+    "common.close": "બંધ કરો",
     "language": "ભાષા",
     "brand.eyebrow": "જૈવિક સંકેત નિરીક્ષણ ઇન્ટરફેસ",
     "signal.feed": "જીવંત સંકેત",
@@ -510,6 +540,12 @@ window.NEUROFRONT_TRANSLATIONS = {
     "baseline.storageUnavailable": "આ બ્રાઉઝરમાં સાચવેલી આધારરેખાઓ ઉપલબ્ધ નથી. તમે હજી પણ ફરી કેલિબ્રેટ કરી શકો છો."
   },
   "pa": {
+    "baseline.progressButton": "ਕੈਲੀਬ੍ਰੇਸ਼ਨ ਜਾਰੀ ਹੈ…",
+    "measurement.measuring": "ਮਾਪ ਜਾਰੀ ਹੈ…",
+    "measurement.again": "ਦੁਬਾਰਾ ਮਾਪੋ",
+    "measurement.begin": "ਮਾਪ ਸ਼ੁਰੂ ਕਰੋ",
+    "common.cancel": "ਰੱਦ ਕਰੋ",
+    "common.close": "ਬੰਦ ਕਰੋ",
     "language": "ਭਾਸ਼ਾ",
     "brand.eyebrow": "ਜੈਵਿਕ ਸੰਕੇਤ ਨਿਗਰਾਨੀ ਇੰਟਰਫੇਸ",
     "signal.feed": "ਲਾਈਵ ਸੰਕੇਤ",
@@ -612,6 +648,12 @@ window.NEUROFRONT_TRANSLATIONS = {
     "baseline.storageUnavailable": "ਇਸ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਸੰਭਾਲੀਆਂ ਆਧਾਰ ਰੇਖਾਵਾਂ ਉਪਲਬਧ ਨਹੀਂ ਹਨ। ਤੁਸੀਂ ਫਿਰ ਵੀ ਦੁਬਾਰਾ ਕੈਲੀਬ੍ਰੇਟ ਕਰ ਸਕਦੇ ਹੋ।"
   },
   "or": {
+    "baseline.progressButton": "କାଲିବ୍ରେସନ୍ ଚାଲିଛି…",
+    "measurement.measuring": "ମାପନ ଚାଲିଛି…",
+    "measurement.again": "ପୁଣି ମାପନ କରନ୍ତୁ",
+    "measurement.begin": "ମାପନ ଆରମ୍ଭ କରନ୍ତୁ",
+    "common.cancel": "ବାତିଲ କରନ୍ତୁ",
+    "common.close": "ବନ୍ଦ କରନ୍ତୁ",
     "language": "ଭାଷା",
     "brand.eyebrow": "ଜୈବ ସଙ୍କେତ ନିରୀକ୍ଷଣ ଇଣ୍ଟରଫେସ୍",
     "signal.feed": "ସିଧାସଳଖ ସଙ୍କେତ",
@@ -714,6 +756,12 @@ window.NEUROFRONT_TRANSLATIONS = {
     "baseline.storageUnavailable": "ଏହି ବ୍ରାଉଜରରେ ସଞ୍ଚିତ ଆଧାରରେଖା ଉପଲବ୍ଧ ନାହିଁ। ଆପଣ ତଥାପି ପୁଣି କାଲିବ୍ରେଟ୍ କରିପାରିବେ।"
   },
   "ta": {
+    "baseline.progressButton": "அளவுத்திருத்தம் நடைபெறுகிறது…",
+    "measurement.measuring": "அளவிடப்படுகிறது…",
+    "measurement.again": "மீண்டும் அளவிடவும்",
+    "measurement.begin": "அளவீட்டைத் தொடங்கவும்",
+    "common.cancel": "ரத்து செய்யவும்",
+    "common.close": "மூடவும்",
     "language": "மொழி",
     "brand.eyebrow": "உயிரியல் சமிக்ஞைக் கண்காணிப்பு இடைமுகம்",
     "signal.feed": "நேரடி சமிக்ஞை",
@@ -816,6 +864,12 @@ window.NEUROFRONT_TRANSLATIONS = {
     "baseline.storageUnavailable": "இந்த உலாவியில் சேமித்த அடிப்படைகள் கிடைக்கவில்லை. நீங்கள் மீண்டும் அளவுத்திருத்தலாம்."
   },
   "te": {
+    "baseline.progressButton": "క్రమాంకనం జరుగుతోంది…",
+    "measurement.measuring": "కొలత జరుగుతోంది…",
+    "measurement.again": "మళ్లీ కొలవండి",
+    "measurement.begin": "కొలత ప్రారంభించండి",
+    "common.cancel": "రద్దు చేయండి",
+    "common.close": "మూసివేయండి",
     "language": "భాష",
     "brand.eyebrow": "జీవ సంకేతాల పర్యవేక్షణ ఇంటర్‌ఫేస్",
     "signal.feed": "ప్రత్యక్ష సంకేత ప్రవాహం",
@@ -918,6 +972,12 @@ window.NEUROFRONT_TRANSLATIONS = {
     "baseline.storageUnavailable": "ఈ బ్రౌజర్‌లో సేవ్ చేసిన ఆధారస్థాయిలు అందుబాటులో లేవు. మీరు మళ్లీ క్రమాంకనం చేయవచ్చు."
   },
   "kn": {
+    "baseline.progressButton": "ಮಾಪನಾಂಕ ನಡೆಯುತ್ತಿದೆ…",
+    "measurement.measuring": "ಮಾಪನ ನಡೆಯುತ್ತಿದೆ…",
+    "measurement.again": "ಮತ್ತೆ ಮಾಪನ ಮಾಡಿ",
+    "measurement.begin": "ಮಾಪನ ಪ್ರಾರಂಭಿಸಿ",
+    "common.cancel": "ರದ್ದುಮಾಡಿ",
+    "common.close": "ಮುಚ್ಚಿ",
     "language": "ಭಾಷೆ",
     "brand.eyebrow": "ಜೈವಿಕ ಸಂಕೇತ ಮೇಲ್ವಿಚಾರಣೆಯ ಇಂಟರ್‌ಫೇಸ್",
     "signal.feed": "ನೇರ ಸಂಕೇತ ಪ್ರವಾಹ",
@@ -1020,6 +1080,12 @@ window.NEUROFRONT_TRANSLATIONS = {
     "baseline.storageUnavailable": "ಈ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಉಳಿಸಿದ ಮೂಲಮಟ್ಟಗಳು ಲಭ್ಯವಿಲ್ಲ. ನೀವು ಮತ್ತೆ ಮಾಪನಾಂಕ ಮಾಡಬಹುದು."
   },
   "ml": {
+    "baseline.progressButton": "ക്രമീകരിക്കുന്നു…",
+    "measurement.measuring": "അളക്കുന്നു…",
+    "measurement.again": "വീണ്ടും അളക്കുക",
+    "measurement.begin": "അളവ് ആരംഭിക്കുക",
+    "common.cancel": "റദ്ദാക്കുക",
+    "common.close": "അടയ്ക്കുക",
     "language": "ഭാഷ",
     "brand.eyebrow": "ജൈവ സിഗ്നൽ നിരീക്ഷണ ഇന്റർഫേസ്",
     "signal.feed": "തത്സമയ സിഗ്നൽ പ്രവാഹം",
@@ -1122,6 +1188,12 @@ window.NEUROFRONT_TRANSLATIONS = {
     "baseline.storageUnavailable": "ഈ ബ്രൗസറിൽ സംരക്ഷിച്ച അടിസ്ഥാനനിലകൾ ലഭ്യമല്ല. നിങ്ങൾക്ക് വീണ്ടും ക്രമീകരിക്കാം."
   },
   "as": {
+    "baseline.progressButton": "কেলিব্ৰেচন চলি আছে…",
+    "measurement.measuring": "মাপ লোৱা হৈছে…",
+    "measurement.again": "আকৌ মাপ লওক",
+    "measurement.begin": "মাপ আৰম্ভ কৰক",
+    "common.cancel": "বাতিল কৰক",
+    "common.close": "বন্ধ কৰক",
     "language": "ভাষা",
     "brand.eyebrow": "জৈৱ সংকেত নিৰীক্ষণ ইণ্টাৰফেচ",
     "signal.feed": "প্ৰত্যক্ষ সংকেত প্ৰবাহ",
@@ -1224,6 +1296,12 @@ window.NEUROFRONT_TRANSLATIONS = {
     "baseline.storageUnavailable": "এই ব্ৰাউজাৰত সংৰক্ষিত মূল মাত্ৰা উপলব্ধ নহয়। আপুনি পুনৰ কেলিব্ৰেচন কৰিব পাৰে।"
   },
   "ur": {
+    "baseline.progressButton": "کیلیبریشن جاری ہے…",
+    "measurement.measuring": "پیمائش جاری ہے…",
+    "measurement.again": "دوبارہ پیمائش کریں",
+    "measurement.begin": "پیمائش شروع کریں",
+    "common.cancel": "منسوخ کریں",
+    "common.close": "بند کریں",
     "language": "زبان",
     "brand.eyebrow": "حیاتیاتی سگنلز کی نگرانی کا انٹرفیس",
     "signal.feed": "براہ راست سگنل",

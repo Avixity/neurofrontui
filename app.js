@@ -33,6 +33,12 @@ const refs = {
   baselineNote: document.getElementById("baselineNote"),
   connectButton: document.getElementById("connectButton"),
   measureButton: document.getElementById("measureButton"),
+  measureAgainButton: document.getElementById("measureAgainButton"),
+  baselineChoices: document.getElementById("baselineChoices"),
+  completedActions: document.getElementById("completedActions"),
+  calibrationProgressButton: document.getElementById("calibrationProgressButton"),
+  measurementDialog: document.getElementById("setupImageDialog"),
+  beginMeasurementButton: document.getElementById("beginMeasurementButton"),
   exportButton: document.getElementById("exportButton"),
   recalibrateButton: document.getElementById("recalibrateButton"),
   savedBaselineButton: document.getElementById("savedBaselineButton"),
@@ -84,6 +90,7 @@ const state = {
   status: "disconnected",
   leadOff: false,
   source: "idle",
+  flow: "baseline",
   bluetoothValue: IDLE_BASELINE,
   lastIncomingTime: 0,
   device: null,
@@ -205,7 +212,7 @@ function isDeviceConnected() {
 }
 
 function canStartMeasurement() {
-  return Boolean(state.characteristic && isDeviceConnected() && state.baseline.ready && !state.calibration.active)
+  return Boolean(state.flow === "ready" && state.characteristic && isDeviceConnected() && state.baseline.ready && !state.calibration.active)
 }
 
 function setStatus(status) {
@@ -248,7 +255,7 @@ function updateStressMeter(score, label, feedback, note) {
 }
 
 function refreshStressState(sampleWindow) {
-  if (state.calibration.active) {
+  if (state.calibration.active && !state.measurement.completed) {
     const remainingSeconds = Math.max(0, (BASELINE_MS - (performance.now() - state.calibration.startTime)) / 1000)
     const feedback = `Sit relaxed while baseline calibrates. About ${remainingSeconds.toFixed(1)} seconds remaining.`
     state.stress.score = 50
@@ -411,6 +418,7 @@ function setBaselineTimer(seconds, progress, label, status) {
 function startCalibration() {
   if (!state.characteristic || !isDeviceConnected() || state.measurement.active || state.calibration.active) return
   state.calibration = { active: true, startTime: performance.now(), samples: [], holdTimer: false }
+  state.flow = "calibrating"
   refs.countdownCard.classList.add("is-running")
   window.NeuroFrontI18n.setText(refs.baselineActionStatus, "Calibrating your baseline")
   setBaselineTimer(BASELINE_MS / 1000, 0, "Calibration Window", "Calibrating your baseline")
@@ -422,6 +430,7 @@ function cancelCalibration(message = "Calibration cancelled. Your previous basel
   state.calibration.active = false
   state.calibration.samples = []
   state.calibration.holdTimer = true
+  state.flow = "baseline"
   refs.countdownCard.classList.remove("is-running")
   window.NeuroFrontI18n.setText(refs.baselineActionStatus, message)
   setBaselineTimer(MEASUREMENT_MS / 1000, 0, "Measurement Window", "Ready for 15 second capture")
@@ -433,6 +442,7 @@ function useSavedBaseline() {
   const record = state.savedBaseline
   if (!validateSavedBaseline(record)) return
   state.baseline = { ...record.features, samples: record.samples.slice(), ready: true, createdAt: record.createdAt }
+  state.flow = "ready"
   state.calibration.holdTimer = true
   window.NeuroFrontI18n.setText(refs.baselineActionStatus, "Saved baseline selected.")
   setBaselineTimer(MEASUREMENT_MS / 1000, 0, "Measurement Window", "Baseline ready. Start a measurement when you are ready.")
@@ -463,6 +473,7 @@ function updateCalibration(now) {
     createdAt, samples, features
   }
   state.baseline = { ...features, samples: samples.slice(), ready: true, createdAt }
+  state.flow = "ready"
   state.calibration.active = false
   state.calibration.samples = []
   state.calibration.holdTimer = true
@@ -597,11 +608,16 @@ function finalizeMeasurement() {
   setMeasurementIdle()
   window.NeuroFrontI18n.setText(refs.measurementState, "Measurement complete")
   const samples = state.measurement.samples.slice()
+  state.flow = samples.length ? "complete" : "ready"
   state.exportSnapshot.buffer = samples.slice()
   state.exportSnapshot.axisMin = state.axisMin
   state.exportSnapshot.axisMax = state.axisMax
   if (!samples.length) {
+    state.measurement.completed = false
+    state.measurement.revealed = false
+    window.NeuroFrontI18n.setText(refs.measurementState, "No live signal detected")
     resetLiveSessionState()
+    updateControlsAvailability(performance.now())
     return
   }
   const average = samples.reduce((sum, value) => sum + value, 0) / samples.length
@@ -625,12 +641,23 @@ function finalizeMeasurement() {
   refs.summaryPanel.classList.add("visible")
   refreshStressState(samples)
   resetLiveSessionState()
+  updateControlsAvailability(performance.now())
+}
+
+function measureAgain() {
+  if (state.flow !== "complete" || state.measurement.active || state.calibration.active) return
+  state.flow = "baseline"
+  state.calibration.holdTimer = true
+  window.NeuroFrontI18n.setText(refs.baselineActionStatus, "Choose Recalibrate or Use Saved Baseline before measuring.")
+  setBaselineTimer(MEASUREMENT_MS / 1000, 0, "Measurement Window", "Choose a baseline")
+  updateControlsAvailability(performance.now())
 }
 
 function startMeasurement() {
   if (state.measurement.active || !canStartMeasurement()) {
     return
   }
+  state.flow = "measuring"
   refs.summaryPanel.classList.remove("visible")
   state.exportSnapshot.buffer = []
   state.exportSnapshot.axisMin = -20
@@ -652,10 +679,12 @@ function startMeasurement() {
   refreshStressState([])
   window.NeuroFrontI18n.setText(refs.measurementState, "Recording in progress")
   refs.measureButton.disabled = true
-  window.NeuroFrontI18n.setText(refs.measureButton, "Recording")
+  window.NeuroFrontI18n.setText(refs.measureButton, "Measuring…")
+  window.NeuroFrontI18n.setText(refs.baselineActionStatus, "")
   refs.countdownCard.classList.add("is-running")
   refs.countdownValue.textContent = "15.0"
   refs.countdownRing.style.strokeDashoffset = "0"
+  updateControlsAvailability(performance.now())
 }
 
 function updateMeasurement(now) {
@@ -806,13 +835,17 @@ function updateChartState(now) {
 }
 
 function updateControlsAvailability(now) {
+  refs.baselineChoices.hidden = state.flow !== "baseline"
+  refs.calibrationProgressButton.hidden = state.flow !== "calibrating"
+  refs.measureButton.hidden = state.flow !== "ready" && state.flow !== "measuring"
+  refs.completedActions.hidden = state.flow !== "complete"
   refs.recalibrateButton.disabled = !isDeviceConnected() || !state.characteristic || state.measurement.active || state.calibration.active
   refs.savedBaselineButton.disabled = !state.savedBaseline || !isDeviceConnected() || !state.characteristic || state.measurement.active || state.calibration.active
   refs.cancelCalibrationButton.hidden = !state.calibration.active
   refs.measureButton.disabled = state.measurement.active || !canStartMeasurement()
-  if (!state.measurement.active) {
-    window.NeuroFrontI18n.setText(refs.measureButton, "Start Measurement")
-  }
+  refs.beginMeasurementButton.disabled = !canStartMeasurement()
+  refs.exportButton.disabled = !state.measurement.completed || !state.exportSnapshot.buffer.length
+  window.NeuroFrontI18n.setText(refs.measureButton, state.measurement.active ? "Measuring…" : "Start Measurement")
 }
 
 function updateChart() {
@@ -970,6 +1003,8 @@ function exportChartAsPng() {
 
 function handleDisconnect() {
   if (state.calibration.active) cancelCalibration("Calibration interrupted. Your previous baseline is unchanged.")
+  state.flow = state.flow === "complete" ? "complete" : "baseline"
+  if (refs.measurementDialog.open) refs.measurementDialog.close("disconnected")
   const hasCompletedPreview = state.measurement.completed && state.exportSnapshot.buffer.length
   if (state.characteristic) {
     state.characteristic.removeEventListener("characteristicvaluechanged", handleCharacteristic)
@@ -1003,9 +1038,10 @@ function handleDisconnect() {
     refs.summaryPanel.classList.remove("visible")
   }
   resetLiveSessionState()
-  refreshStressState([])
+  refreshStressState(hasCompletedPreview ? state.exportSnapshot.buffer : [])
   setMeasurementIdle()
   setStatus("disconnected")
+  updateControlsAvailability(performance.now())
 }
 
 function handleCharacteristic(event) {
@@ -1084,7 +1120,7 @@ async function connectBluetooth() {
 
 function bindEvents() {
   refs.connectButton.addEventListener("click", connectBluetooth)
-  refs.measureButton.addEventListener("click", startMeasurement)
+  refs.measureAgainButton.addEventListener("click", measureAgain)
   refs.exportButton.addEventListener("click", exportChartAsPng)
   refs.recalibrateButton.addEventListener("click", startCalibration)
   refs.savedBaselineButton.addEventListener("click", useSavedBaseline)

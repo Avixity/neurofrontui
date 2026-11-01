@@ -210,10 +210,9 @@ h2 {
 .summary-panel { grid-column: 1 / -1; }
 .dashboard > *, .lower-controls > * { min-width: 0; }
 .lower-controls {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  display: flex;
 }
+.lower-controls > .controls-panel { width: 100%; }
 
 .page-disclaimer {
   margin: auto 0 0;
@@ -248,9 +247,9 @@ h2 {
 .chart-panel {
   display: flex;
   flex-direction: column;
-  min-height: clamp(320px, calc(100svh - 416px), 500px);
+  min-height: 600px;
   min-width: 0;
-  padding: 16px;
+  padding: 20px;
 }
 
 .panel-head {
@@ -316,7 +315,7 @@ h2 {
   position: relative;
   flex: 1;
   min-width: 0;
-  min-height: 240px;
+  min-height: 420px;
   padding: 12px 14px 12px 10px;
   border-radius: calc(var(--radius-lg) - 8px);
   background:
@@ -363,15 +362,14 @@ h2 {
 
 .metric-panel,
 .controls-panel,
-.setup-panel,
 .summary-panel {
-  padding: 12px;
+  padding: 20px;
 }
 
 .metric-panel {
   display: grid;
-  gap: 8px;
-  align-content: start;
+  gap: 12px;
+  align-content: stretch;
 }
 
 .metric-card,
@@ -388,8 +386,9 @@ h2 {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-content: center;
-  gap: 3px 10px;
-  padding: 8px 12px;
+  gap: 8px 14px;
+  min-height: 104px;
+  padding: 18px;
 }
 .metric-card > .metric-label { align-self: end; }
 .metric-card > .metric-row {
@@ -410,7 +409,8 @@ h2 {
 
 .stress-card {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
-  gap: 4px 8px;
+  gap: 10px 12px;
+  min-height: 210px;
 }
 .stress-card > .stress-head,
 .stress-card > .stress-bar,
@@ -418,7 +418,7 @@ h2 {
 .stress-card > .metric-detail { grid-column: 1 / -1; }
 .stress-card > .stress-label { grid-column: 1; grid-row: 4; }
 .stress-card > .baseline-note { grid-column: 2; grid-row: 4; text-align: right; align-self: center; }
-.stress-card .metric-detail { line-height: 1.35; }
+.stress-card .metric-detail { line-height: 1.5; }
 
 .stress-head {
   display: flex;
@@ -502,6 +502,7 @@ h2 {
 .metric-detail {
   color: rgba(177, 191, 209, 0.84);
   font-size: 0.92rem;
+  line-height: 1.5;
 }
 
 .trend-pill {
@@ -548,60 +549,44 @@ h2 {
 .controls-panel {
   display: grid;
   align-content: center;
-  gap: 8px;
+  gap: 10px;
 }
-.setup-panel { display: block; }
-.setup-card { display: grid; gap: 7px; }
-.setup-panel .panel-head { align-items: center; }
-.setup-image-button {
-  position: relative;
-  width: 56px;
-  flex: 0 0 56px;
-  padding: 0;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.02);
-  cursor: zoom-in;
-  overflow: hidden;
-}
-.setup-image {
-  display: block;
-  width: 100%;
-  height: 56px;
-  object-fit: contain;
-}
-.setup-expand-icon {
-  position: absolute;
-  right: 3px;
-  bottom: 3px;
-  width: 22px;
-  height: 22px;
-  padding: 3px;
-  border-radius: 5px;
-  color: var(--text);
-  background: var(--bg-1);
-}
-.setup-copy { display: contents; }
+.setup-copy { display: grid; align-content: center; gap: 18px; }
 .setup-text {
   color: rgba(226, 234, 243, 0.92);
-  font-size: 0.86rem;
-  line-height: 1.4;
+  font-size: 1rem;
+  line-height: 1.6;
 }
 .setup-list {
-  grid-column: 1 / -1;
   margin: 0;
-  padding-left: 17px;
+  padding-left: 20px;
   color: rgba(177, 191, 209, 0.9);
-  font-size: 0.84rem;
-  line-height: 1.42;
+  font-size: 0.94rem;
+  line-height: 1.6;
 }
-.setup-list li + li { margin-top: 3px; }
-.button-group { display: grid; gap: 8px; }
+.setup-list li + li { margin-top: 12px; }
+.button-group { display: grid; gap: 12px; }
+#connectButton { width: min(100%, 220px); }
+.session-action-area { min-width: 0; }
 .baseline-buttons, .measurement-buttons {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 12px;
 }
+.text-button {
+  justify-self: start;
+  min-height: 44px;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.88rem;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+.text-button:hover { color: var(--text); }
 .control-note {
   color: var(--muted);
   font-size: 0.79rem;
@@ -659,7 +644,7 @@ h2 {
 .timer-panel {
   display: grid;
   align-items: center;
-  padding: 12px;
+  padding: 20px;
 }
 .countdown-card {
   display: grid;
@@ -809,18 +794,18 @@ button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
-button[hidden] { display: none; }
-.measurement-buttons:has(#cancelCalibrationButton:not([hidden])) #measureButton { display: none; }
+[hidden] { display: none !important; }
 .setup-dialog {
-  width: min(820px, calc(100% - 32px));
+  width: min(920px, calc(100% - 32px));
   max-height: calc(100svh - 40px);
-  padding: 18px;
+  padding: 24px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
   color: var(--text);
   background: var(--panel-strong);
   box-shadow: var(--shadow);
   overflow: auto;
+  overscroll-behavior: contain;
 }
 .setup-dialog::backdrop { background: rgba(3, 6, 12, 0.82); }
 .setup-dialog-head {
@@ -828,15 +813,41 @@ button[hidden] { display: none; }
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  margin-bottom: 12px;
+  margin-bottom: 20px;
 }
-.setup-dialog-close { width: auto; }
-.setup-dialog > img { display: block; width: 100%; height: auto; }
+.setup-dialog-close {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  padding: 10px;
+}
+.setup-dialog-close svg { width: 22px; height: 22px; }
+.setup-dialog-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+}
+.setup-illustration {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+}
+.setup-dialog-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 24px;
+}
 
 @media (max-width: 1100px) {
   .dashboard { grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr); }
-  .lower-controls { grid-template-columns: minmax(0, 1fr); }
-  .chart-panel { min-height: 370px; }
+  .metric-card { padding: 16px; }
+  .countdown-card { gap: 10px; padding: 12px; }
+  .timer-panel { padding: 16px; }
 }
 @media (max-width: 860px) {
   .app-shell { width: calc(100% - 28px); padding-top: 18px; }
@@ -848,13 +859,14 @@ button[hidden] { display: none; }
   .metric-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .metric-card { grid-template-columns: minmax(0, 1fr); }
   .metric-card > .metric-row { grid-column: 1; grid-row: auto; }
-  .lower-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .chart-panel { min-height: 460px; }
+  .chart-wrap { min-height: 340px; }
   .chart-stage { grid-template-columns: 38px minmax(0, 1fr); }
   .chart-x-axis { padding-left: 50px; }
   .countdown-card { grid-template-columns: auto minmax(0, 1fr); }
 }
 @media (max-width: 640px) {
-  .chart-panel, .metric-panel, .controls-panel, .setup-panel, .summary-panel { padding: 14px; }
+  .chart-panel, .metric-panel, .controls-panel, .summary-panel { padding: 16px; }
   .panel-head { gap: 12px; }
   .stream-meta { flex-direction: column; align-items: flex-end; gap: 8px; }
   .meta-chip { padding: 7px 9px; font-size: 0.8rem; }
@@ -862,8 +874,8 @@ button[hidden] { display: none; }
   .brand-assets { gap: 10px; }
   .brand-icon { width: 38px; height: 38px; }
   .brand-logo { width: min(55vw, 210px); }
-  .lower-controls { grid-template-columns: minmax(0, 1fr); }
-  .chart-panel { min-height: 380px; }
+  .chart-panel { min-height: 420px; }
+  .chart-wrap { min-height: 300px; }
   .chart-stage { grid-template-columns: 28px minmax(0, 1fr); gap: 6px; }
   .chart-x-axis { padding-left: 34px; }
   .chart-overlay { padding: 14px; font-size: 0.8rem; text-align: center; line-height: 1.5; }
@@ -872,16 +884,16 @@ button[hidden] { display: none; }
   .stress-card { grid-column: 1 / -1; }
   .metric-card.emphasis { grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) auto; }
   .metric-card.emphasis > .metric-row { grid-column: 2; grid-row: 1 / span 2; }
-  .setup-card { gap: 10px; }
-  .setup-image-button { width: 64px; flex-basis: 64px; }
-  .setup-image { height: 64px; }
-  .setup-text, .setup-list { font-size: 0.9rem; line-height: 1.5; }
-  .setup-list li + li { margin-top: 5px; }
+  #connectButton { width: 100%; }
+  .baseline-buttons, .measurement-buttons { gap: 8px; }
   .summary-grid { gap: 8px; }
   .summary-card { padding: 10px; }
   .summary-label { font-size: 0.72rem; letter-spacing: 0.02em; }
-  .setup-dialog { padding: 12px; }
-  .setup-dialog-head { flex-wrap: wrap; }
+  .setup-dialog { width: calc(100% - 24px); max-height: calc(100svh - 24px); padding: 16px; }
+  .setup-dialog-head { gap: 12px; margin-bottom: 16px; }
+  .setup-dialog-content { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .setup-illustration { max-width: 380px; justify-self: center; }
+  .setup-dialog-actions { gap: 8px; margin-top: 20px; }
 }
 @media (max-width: 360px) {
   .metric-panel { grid-template-columns: minmax(0, 1fr); }
