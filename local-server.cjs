@@ -7,7 +7,7 @@ const handler = require("./assistant-api.js")
 const accountConfig = require("./account-config-api.js")
 
 const publicFiles = new Set([
-  "index.html", "email-preview.html", "styles.css", "app.js", "language.js", "language-data.js",
+  "index.html", "email-preview.html", "recovery-email-preview.html", "styles.css", "app.js", "language.js", "language-data.js",
   "capture-language.js", "capture-history.js", "resource-data.js", "resources.js",
   "setup-viewer.js", "score-config.js", "assistant-language.js", "assistant.js",
   "assistant-avatar.webp", "icon-512.png", "image.png", "NEUROFRONTLOGO.png"

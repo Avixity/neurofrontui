@@ -8,7 +8,7 @@ The hosted **NeuroFront** project (`feblbpepamcklqgoemyt`) was created on the fr
 
 The project owner confirmed that the production Site URL and redirect URL are both set to `https://neurofrontui.vercel.app/`.
 
-A branded sign-up confirmation template and browser preview are available. See [Email setup](EMAIL_SETUP.md) for the design, subject and custom SMTP activation steps. The template is not active until installed in Supabase after configuring custom SMTP.
+Branded sign-up confirmation and password-reset templates with browser previews are available. See [Email setup](EMAIL_SETUP.md) for the designs, subjects and custom SMTP activation steps. The templates are not active until installed in Supabase after configuring custom SMTP.
 
 **Remaining provider setup:** configure a production SMTP provider. No SMTP credentials were supplied. Supabase's default development mail service restricts recipients and delivery, so public sign-up and password recovery are not considered verified until real confirmation and recovery emails have been tested. These remaining settings do not prevent guest measurement. Add the local callback URLs below if testing email links on a local preview.
 
