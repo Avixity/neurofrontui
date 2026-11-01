@@ -320,22 +320,21 @@
 
 <section class="assistant-panel" id="assistantPanel" role="dialog" aria-modal="false" aria-labelledby="assistantTitle" hidden>
   <header class="assistant-header">
-    <img class="assistant-avatar" src="assistant-avatar.webp?v=portrait-1" width="44" height="44" alt="">
+    <img class="assistant-avatar" src="assistant-avatar.webp?v=guide-2" width="36" height="36" alt="">
     <div class="assistant-heading">
-      <h2 id="assistantTitle" data-i18n="assistant.title">NeuroFront Assistant</h2>
-      <p data-i18n="assistant.ai">AI assistant</p>
+      <h2 id="assistantTitle" data-i18n="assistant.title">NeuroFront AI</h2>
     </div>
+    <button class="assistant-new-chat" id="assistantNewChat" type="button" aria-label="New Chat" data-i18n-aria-label="assistant.newChat">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M19 12v7H5V5h7M17 3v8M13 7h8"/></svg><span data-i18n="assistant.newChat">New Chat</span>
+    </button>
     <button class="assistant-icon-button" id="assistantClose" type="button" aria-label="Minimize assistant" data-i18n-aria-label="assistant.minimize">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 12h12"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg>
     </button>
   </header>
-  <div class="assistant-toolbar">
-    <button class="text-button" id="assistantNewChat" type="button" data-i18n="assistant.newChat">New Chat</button>
-  </div>
   <div class="assistant-context" id="assistantContext" hidden>
     <span id="assistantContextText"></span>
     <button class="assistant-icon-button" id="assistantClearContext" type="button" aria-label="Clear selected capture" data-i18n-aria-label="assistant.clearContext">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m7 7 10 10M7 17 10-10"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m7 7 10 10M7 17 17 7"/></svg>
     </button>
   </div>
   <div class="assistant-messages" id="assistantMessages" role="log" aria-live="polite" aria-relevant="additions text" tabindex="0"></div>
@@ -346,16 +345,20 @@
   </div>
   <form class="assistant-form" id="assistantForm">
     <label class="assistant-input-label" for="assistantInput" data-i18n="assistant.message">Your message</label>
-    <textarea id="assistantInput" rows="2" maxlength="1200" autocomplete="off" placeholder="Ask about NeuroFront or your readings" data-i18n-placeholder="assistant.placeholder"></textarea>
+    <textarea id="assistantInput" rows="1" maxlength="1200" autocomplete="off" placeholder="Ask NeuroFront AI…" data-i18n-placeholder="assistant.placeholder"></textarea>
     <div class="assistant-compose-actions">
-      <button class="action-button ghost" id="assistantStop" type="button" hidden data-i18n="assistant.stop">Stop</button>
-      <button class="action-button accent" id="assistantSend" type="submit" data-i18n="assistant.send">Send</button>
+      <button class="assistant-icon-button" id="assistantStop" type="button" hidden aria-label="Stop" data-i18n-aria-label="assistant.stop"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>
+      <button class="assistant-send-button" id="assistantSend" type="submit" aria-label="Send" data-i18n-aria-label="assistant.send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button>
     </div>
   </form>
 </section>
-<button class="assistant-launcher" id="assistantLauncher" type="button" aria-expanded="false" aria-controls="assistantPanel" aria-haspopup="dialog" aria-label="Open NeuroFront Assistant" data-i18n-aria-label="assistant.open">
-  <img src="assistant-avatar.webp?v=portrait-1" width="52" height="52" alt="">
-</button>
+<div class="assistant-launch-area" id="assistantLaunchArea">
+  <p class="assistant-callout" id="assistantCallout" role="status" data-i18n="assistant.callout">I can help explain your readings, baselines and NeuroFront setup.</p>
+  <button class="assistant-launcher" id="assistantLauncher" type="button" aria-expanded="false" aria-controls="assistantPanel" aria-haspopup="dialog" aria-label="Open NeuroFront AI" data-i18n-aria-label="assistant.open">
+    <img src="assistant-avatar.webp?v=guide-2" width="52" height="52" alt="">
+  </button>
+  <span class="assistant-launcher-label" id="assistantLauncherLabel">NeuroFront AI</span>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="language-data.js" defer></script>

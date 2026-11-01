@@ -1,6 +1,6 @@
 (() => {
   "use strict"
-  const ids = ["assistantLauncher", "assistantPanel", "assistantClose", "assistantNewChat", "assistantContext", "assistantContextText", "assistantClearContext", "assistantMessages", "assistantStatus", "assistantRetry", "assistantNotice", "assistantNoticeClose", "assistantForm", "assistantInput", "assistantSend", "assistantStop", "getMeasurementExplanation", "captureExplain"]
+  const ids = ["assistantLauncher", "assistantPanel", "assistantClose", "assistantNewChat", "assistantContext", "assistantContextText", "assistantClearContext", "assistantMessages", "assistantStatus", "assistantRetry", "assistantNotice", "assistantNoticeClose", "assistantLaunchArea", "assistantCallout", "assistantForm", "assistantInput", "assistantSend", "assistantStop", "getMeasurementExplanation", "captureExplain"]
   const ui = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]))
   const features = ["mean", "rms", "stdDev", "peakToPeak", "derivativeMean"]
   const allowedResources = new Set(window.NEUROFRONT_RESOURCES.map(resource => resource.id))
@@ -10,8 +10,7 @@
   const newId = () => crypto.randomUUID()
   let threadId = newId(), threadOwner = owner(), revision = 0
   let selected = null, request = null, retry = null, statusKey = "", origin = null, generation = 0
-  let notice = null
-  const noticePauses = new Set()
+  let followLatest = true, savedScrollTop = 0
   const lang = () => document.documentElement.lang || "en"
   const t = (key, values = {}) => (window.NEUROFRONT_TRANSLATIONS[lang()]?.[key] || window.NEUROFRONT_TRANSLATIONS.en[key] || key).replace(/\{(\w+)\}/g, (match, key) => values[key] ?? match)
   const date = value => Number.isFinite(Date.parse(value)) ? new Intl.DateTimeFormat(lang(), { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : t("history.notAvailable")
@@ -23,6 +22,7 @@
   }
   function messageText(message) {
     if (message.kind === "request" && message.status !== "completed") return t(message.status === "pending" ? "assistant.loading" : message.status === "stopped" ? "assistant.messageStopped" : "assistant.messageFailed")
+    if (message.kind === "greeting") return t("assistant.greeting")
     if (message.kind === "safety") return t("assistant.safety")
     if (message.kind === "preset" && message.capture) return preset(message.capture)
     if (message.kind === "explain" && message.capture) return t("assistant.explainMessage", { date: date(message.capture.completedAt) })
@@ -67,49 +67,22 @@
     button.addEventListener("click", () => window.NeuroFrontResources.open(id, button))
     return button
   }
-  function clearNotice() {
-    if (notice?.timer) clearTimeout(notice.timer)
-    notice = null
-    noticePauses.clear()
-  }
-  function dismissNotice() {
-    if (!notice || notice.dismissed) return
-    clearTimeout(notice.timer)
-    notice.dismissed = true
-    if (ui.assistantNotice?.contains(document.activeElement)) {
-      ui.assistantMessages.querySelector(`[data-retry-id="${notice.messageId}"]`)?.focus({ preventScroll: true })
-    }
-    renderStatus()
-  }
-  function pauseNotice(source, paused) {
-    if (!notice || notice.dismissed) return
-    if (notice.timer) {
-      clearTimeout(notice.timer)
-      notice.remaining = Math.max(0, notice.remaining - (performance.now() - notice.started))
-      notice.timer = null
-    }
-    if (paused) noticePauses.add(source)
-    else noticePauses.delete(source)
-    scheduleNotice()
-  }
-  function scheduleNotice() {
-    if (!notice || notice.dismissed || notice.timer || noticePauses.size || ui.assistantPanel.hidden) return
-    if (notice.remaining <= 0) { dismissNotice(); return }
-    notice.started = performance.now()
-    notice.timer = setTimeout(dismissNotice, notice.remaining)
-  }
-  function showNotice(messageId) {
-    clearNotice()
-    notice = { messageId, remaining: 5000, started: 0, timer: null, dismissed: false }
-    if (ui.assistantNotice?.matches(":hover")) noticePauses.add("notice-hover")
-    if (ui.assistantNotice?.contains(document.activeElement)) noticePauses.add("notice-focus")
-    scheduleNotice()
-  }
   function renderStatus() {
-    const dismissed = statusKey === "assistant.unavailable" && notice?.dismissed
-    ui.assistantStatus.textContent = statusKey && !dismissed ? t(statusKey) : ""
-    ui.assistantRetry.hidden = !retry || Boolean(request) || Boolean(dismissed)
-    if (ui.assistantNoticeClose) ui.assistantNoticeClose.hidden = statusKey !== "assistant.unavailable" || Boolean(dismissed)
+    ui.assistantStatus.textContent = statusKey === "assistant.tooLong" ? t(statusKey) : ""
+    if (ui.assistantNotice) ui.assistantNotice.hidden = statusKey !== "assistant.tooLong"
+    if (ui.assistantRetry) ui.assistantRetry.hidden = true
+    if (ui.assistantNoticeClose) ui.assistantNoticeClose.hidden = true
+  }
+  function greet() {
+    if (messages.length) return
+    append({ role: "assistant", kind: "greeting", content: t("assistant.greeting") })
+    persist()
+  }
+  function hideCallout() { ui.assistantLaunchArea?.classList.remove("is-callout-visible") }
+  function setLauncherVisible(visible) { (ui.assistantLaunchArea || ui.assistantLauncher).hidden = !visible }
+  function resizeComposer() {
+    ui.assistantInput.style.height = "auto"
+    ui.assistantInput.style.height = `${Math.max(44, Math.min(112, ui.assistantInput.scrollHeight))}px`
   }
   function retryFor(message) {
     if (message.job) return message.job
@@ -119,19 +92,9 @@
     return { ...structuredClone(data), capture, missingCapture: Boolean(data.captureId && !capture), replyId: message.id }
   }
   function render() {
-    const nearBottom = ui.assistantMessages.scrollHeight - ui.assistantMessages.scrollTop - ui.assistantMessages.clientHeight < 100
+    const previousScrollTop = ui.assistantPanel.hidden ? savedScrollTop : ui.assistantMessages.scrollTop
     const focusedRetry = document.activeElement?.dataset.retryId
     ui.assistantMessages.replaceChildren()
-    if (!messages.length) {
-      const welcome = document.createElement("p")
-      welcome.className = "assistant-welcome"
-      welcome.textContent = t("assistant.welcome")
-      ui.assistantMessages.append(welcome)
-      const starters = document.createElement("div")
-      starters.className = "assistant-starters"
-      for (const id of ["getting-started", "baseline", "readings"]) starters.append(resourceLink(id))
-      ui.assistantMessages.append(starters)
-    }
     for (const message of messages) {
       const element = document.createElement("div")
       element.className = `assistant-message ${message.role}${message.kind === "preset" ? " preset" : ""}`
@@ -139,35 +102,37 @@
       element.dataset.kind = message.kind || "reply"
       element.dataset.messageId = message.id
       element.dataset.status = message.status
-      const paragraph = document.createElement("p")
-      paragraph.dir = "auto"
-      paragraph.textContent = messageText(message)
-      element.append(paragraph)
-      for (const id of message.resourceIds || []) if (allowedResources.has(id)) element.append(resourceLink(id))
-      if (["failed", "stopped", "cancelled"].includes(message.status) && message.retryJob) {
-        const button = document.createElement("button")
-        button.type = "button"
-        button.className = "text-button assistant-message-retry"
-        button.dataset.retryId = message.id
-        button.textContent = t("assistant.retry")
-        button.disabled = Boolean(request)
-        button.addEventListener("click", () => { const job = retryFor(message); if (job) respond(job) })
-        for (const [event, paused] of [["pointerenter", true], ["pointerleave", false]]) button.addEventListener(event, () => { if (notice?.messageId === message.id) pauseNotice("retry-hover", paused) })
-        button.addEventListener("focus", () => { if (notice?.messageId === message.id) pauseNotice("retry-focus", true) })
-        button.addEventListener("blur", () => { if (notice?.messageId === message.id) pauseNotice("retry-focus", false) })
-        element.append(button)
+      if (message.kind === "request" && message.status !== "completed") {
+        element.className = "assistant-inline-status"
+        if (message.status === "pending") {
+          const typing = document.createElement("span")
+          typing.className = "assistant-typing"
+          typing.setAttribute("role", "status")
+          typing.setAttribute("aria-label", t("assistant.loading"))
+          for (let index = 0; index < 3; index++) {
+            const dot = document.createElement("span")
+            dot.setAttribute("aria-hidden", "true")
+            typing.append(dot)
+          }
+          element.append(typing)
+        } else if (message.retryJob) {
+          const button = document.createElement("button")
+          button.type = "button"
+          button.className = "assistant-inline-retry assistant-message-retry"
+          button.dataset.retryId = message.id
+          button.textContent = t(message.status === "stopped" ? "assistant.inlineStopped" : "assistant.inlineUnavailable")
+          button.disabled = Boolean(request)
+          button.addEventListener("click", () => { const job = retryFor(message); if (job) respond(job) })
+          element.append(button)
+        }
+      } else {
+        const paragraph = document.createElement("p")
+        paragraph.dir = "auto"
+        paragraph.textContent = messageText(message)
+        element.append(paragraph)
+        for (const id of message.resourceIds || []) if (allowedResources.has(id)) element.append(resourceLink(id))
       }
       ui.assistantMessages.append(element)
-    }
-    const privacy = document.createElement("p")
-    privacy.className = "assistant-privacy"
-    privacy.textContent = t(threadOwner ? "assistant.accountPrivacy" : "assistant.privacy")
-    ui.assistantMessages.append(privacy)
-    if (retry && !request) {
-      const resources = document.createElement("div")
-      resources.className = "assistant-starters"
-      for (const id of ["baseline", "placement", "habits"]) resources.append(resourceLink(id))
-      ui.assistantMessages.append(resources)
     }
     ui.assistantInput.placeholder = t("assistant.placeholder")
     ui.assistantContext.hidden = !selected
@@ -179,22 +144,32 @@
     ui.getMeasurementExplanation.disabled = Boolean(request)
     ui.captureExplain.disabled = Boolean(request)
     if (focusedRetry) ui.assistantMessages.querySelector(`[data-retry-id="${focusedRetry}"]`)?.focus({ preventScroll: true })
-    if (nearBottom) ui.assistantMessages.scrollTop = ui.assistantMessages.scrollHeight
+    if (!ui.assistantPanel.hidden) ui.assistantMessages.scrollTop = followLatest ? ui.assistantMessages.scrollHeight : previousScrollTop
   }
   function open() {
     if (ui.assistantPanel.hidden) origin = document.activeElement
+    const reopenScrollTop = savedScrollTop
     ui.assistantPanel.hidden = false
+    ui.assistantMessages.scrollTop = followLatest ? ui.assistantMessages.scrollHeight : reopenScrollTop
+    greet()
+    render()
+    hideCallout()
+    setLauncherVisible(false)
     ui.assistantLauncher.setAttribute("aria-expanded", "true")
     updateViewport()
-    scheduleNotice()
-    requestAnimationFrame(() => ui.assistantInput.focus({ preventScroll: true }))
+    resizeComposer()
+    requestAnimationFrame(() => {
+      if (ui.assistantPanel.hidden) return
+      ui.assistantMessages.scrollTop = followLatest ? ui.assistantMessages.scrollHeight : reopenScrollTop
+      ui.assistantInput.focus({ preventScroll: true })
+    })
   }
-  function minimize() {
-    pauseNotice("hidden", true)
+  function minimize(restoreFocus = true) {
+    savedScrollTop = ui.assistantMessages.scrollTop
     ui.assistantPanel.hidden = true
-    noticePauses.delete("hidden")
+    setLauncherVisible(true)
     ui.assistantLauncher.setAttribute("aria-expanded", "false")
-    ;(origin?.isConnected && !origin.closest("dialog:not([open])") ? origin : ui.assistantLauncher).focus({ preventScroll: true })
+    if (restoreFocus) (origin?.isConnected && !origin.closest("dialog:not([open])") ? origin : ui.assistantLauncher).focus({ preventScroll: true })
   }
   function stop() {
     if (!request) return
@@ -203,7 +178,6 @@
     if (message) message.status = "stopped"
     request = null
     generation++
-    clearNotice()
     statusKey = "assistant.stopped"
     persist()
     render()
@@ -216,22 +190,26 @@
     selected = null
     retry = null
     statusKey = ""
-    clearNotice()
     threadId = newId()
     threadOwner = owner()
     revision = 0
+    followLatest = true
+    savedScrollTop = 0
     ui.assistantInput.value = ""
+    resizeComposer()
   }
   function reset() {
     stop()
     persist()
     clearThread()
+    greet()
     render()
     ui.assistantInput.focus({ preventScroll: true })
   }
   function resetForAccount() {
     clearThread()
     ui.getMeasurementExplanation.hidden = true
+    setLauncherVisible(true)
     ui.assistantPanel.hidden = true
     ui.assistantLauncher.setAttribute("aria-expanded", "false")
     render()
@@ -299,7 +277,6 @@
     responseMessage.retryJob = { captureId: job.capture?.id || job.captureId || null, explanation: Boolean(job.explanation), comparisonShown: Boolean(job.comparisonShown), dialogue: structuredClone(job.dialogue) }
     request = { controller, replyId: responseMessage.id }
     retry = job
-    clearNotice()
     statusKey = "assistant.loading"
     persist()
     render()
@@ -349,14 +326,13 @@
       if (currentGeneration !== generation || !isCurrent(expectedOwner)) return
       responseMessage.status = "failed"
       statusKey = job.capture ? "assistant.unavailable" : "assistant.genericUnavailable"
-      if (statusKey === "assistant.unavailable") showNotice(responseMessage.id)
     } finally {
       clearTimeout(timeout)
       if (currentGeneration === generation && isCurrent(expectedOwner)) { request = null; persist(); render() }
     }
   }
   function dialogue() {
-    return messages.filter(message => message.status === "completed" && !["preset", "comparison", "request"].includes(message.kind)).slice(-8).map(message => ({ role: message.role, content: messageText(message).slice(0, 1200) }))
+    return messages.filter(message => message.status === "completed" && !["preset", "comparison", "request", "greeting"].includes(message.kind)).slice(-8).map(message => ({ role: message.role, content: messageText(message).slice(0, 1200) }))
   }
   function explain(capture) {
     if (request || !capture) return
@@ -373,9 +349,11 @@
     if (request) return
     const content = ui.assistantInput.value.trim()
     if (!content) return
-    if (content.length > 1200) { clearNotice(); statusKey = "assistant.tooLong"; render(); return }
+    if (content.length > 1200) { statusKey = "assistant.tooLong"; render(); return }
     append({ role: "user", content, ...(selected ? { captureId: selected.id } : {}) })
+    followLatest = true
     ui.assistantInput.value = ""
+    resizeComposer()
     persist()
     respond({ capture: selected, explanation: false, dialogue: dialogue() })
   }
@@ -392,13 +370,18 @@
   ui.assistantNewChat.addEventListener("click", reset)
   ui.assistantClearContext.addEventListener("click", reset)
   ui.assistantStop.addEventListener("click", stop)
-  ui.assistantRetry.addEventListener("click", () => { if (retry) respond(retry) })
-  ui.assistantNoticeClose?.addEventListener("click", dismissNotice)
-  ui.assistantNotice?.addEventListener("pointerenter", () => pauseNotice("notice-hover", true))
-  ui.assistantNotice?.addEventListener("pointerleave", () => pauseNotice("notice-hover", false))
-  ui.assistantNotice?.addEventListener("focusin", () => pauseNotice("notice-focus", true))
-  ui.assistantNotice?.addEventListener("focusout", () => queueMicrotask(() => pauseNotice("notice-focus", ui.assistantNotice.contains(document.activeElement))))
+  const dismissOutside = event => {
+    if (!ui.assistantPanel.hidden && !ui.assistantPanel.contains(event.target) && !(ui.assistantLaunchArea || ui.assistantLauncher).contains(event.target)) minimize(false)
+  }
+  document.addEventListener("pointerdown", dismissOutside)
+  document.addEventListener("click", dismissOutside, true)
+  ui.assistantMessages.addEventListener("scroll", () => {
+    if (ui.assistantPanel.hidden) return
+    savedScrollTop = ui.assistantMessages.scrollTop
+    followLatest = ui.assistantMessages.scrollHeight - savedScrollTop - ui.assistantMessages.clientHeight < 100
+  }, { passive: true })
   ui.assistantForm.addEventListener("submit", event => { event.preventDefault(); send() })
+  ui.assistantInput.addEventListener("input", resizeComposer)
   ui.assistantInput.addEventListener("keydown", event => {
     if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); send() }
   })
@@ -417,4 +400,11 @@
   window.addEventListener("resize", updateViewport)
   window.NeuroFrontAssistant = Object.freeze({ explain, getSnapshot, restoreThread, resetForAccount, captureStarted() { ui.getMeasurementExplanation.hidden = true } })
   render()
+  const showCallout = () => {
+    if (!ui.assistantLaunchArea || !ui.assistantPanel.hidden) return
+    ui.assistantLaunchArea.classList.add("is-callout-visible")
+    setTimeout(hideCallout, 3500)
+  }
+  if (document.readyState === "complete") showCallout()
+  else window.addEventListener("load", showCallout, { once: true })
 })()
