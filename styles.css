@@ -43,7 +43,6 @@ body {
   opacity: 0;
   transform: translateY(18px);
   transition: opacity 700ms ease, transform 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
-  overflow-x: hidden;
   overflow-y: auto;
 }
 
@@ -74,7 +73,7 @@ body::before {
 body::after {
   width: 320px;
   height: 320px;
-  right: -120px;
+  right: 0;
   bottom: 40px;
   background: rgba(92, 164, 255, 0.22);
 }
@@ -88,7 +87,7 @@ canvas {
   width: min(1400px, calc(100% - 40px));
   margin: 0 auto;
   min-height: 100vh;
-  padding: 16px 0 18px;
+  padding: 16px 0 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -197,16 +196,23 @@ h2 {
 .dashboard {
   display: grid;
   grid-template-columns: minmax(0, 1.9fr) minmax(320px, 0.9fr);
-  gap: 18px;
-  align-items: start;
-  flex: 1;
-  min-height: 0;
+  grid-template-areas: "chart readings" "controls timer";
+  gap: 12px;
+  align-items: stretch;
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
-.main-column {
+.chart-panel { grid-area: chart; }
+.metric-panel { grid-area: readings; }
+.lower-controls { grid-area: controls; }
+.timer-panel { grid-area: timer; }
+.summary-panel { grid-column: 1 / -1; }
+.dashboard > *, .lower-controls > * { min-width: 0; }
+.lower-controls {
   display: grid;
-  gap: 18px;
-  min-height: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .page-disclaimer {
@@ -242,8 +248,9 @@ h2 {
 .chart-panel {
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  padding: 20px;
+  min-height: clamp(320px, calc(100svh - 416px), 500px);
+  min-width: 0;
+  padding: 16px;
 }
 
 .panel-head {
@@ -251,11 +258,11 @@ h2 {
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .panel-head.compact {
-  margin-bottom: 18px;
+  margin-bottom: 10px;
 }
 
 .stream-meta {
@@ -308,7 +315,8 @@ h2 {
 .chart-wrap {
   position: relative;
   flex: 1;
-  min-height: 0;
+  min-width: 0;
+  min-height: 240px;
   padding: 12px 14px 12px 10px;
   border-radius: calc(var(--radius-lg) - 8px);
   background:
@@ -336,8 +344,12 @@ h2 {
 }
 
 .chart-wrap canvas {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 12px 14px 12px 10px;
+  max-width: calc(100% - 24px);
+  max-height: calc(100% - 24px);
+  width: calc(100% - 24px) !important;
+  height: calc(100% - 24px) !important;
 }
 
 .chart-x-axis {
@@ -349,23 +361,17 @@ h2 {
   letter-spacing: 0.06em;
 }
 
-.side-panel {
-  display: grid;
-  gap: 18px;
-  grid-template-rows: auto auto auto;
-  min-height: 0;
-}
-
 .metric-panel,
 .controls-panel,
 .setup-panel,
 .summary-panel {
-  padding: 18px;
+  padding: 12px;
 }
 
 .metric-panel {
   display: grid;
-  gap: 16px;
+  gap: 8px;
+  align-content: start;
 }
 
 .metric-card,
@@ -379,8 +385,21 @@ h2 {
 }
 
 .metric-card {
-  padding: 16px 16px 15px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-content: center;
+  gap: 3px 10px;
+  padding: 8px 12px;
 }
+.metric-card > .metric-label { align-self: end; }
+.metric-card > .metric-row {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  margin: 0;
+}
+.metric-card > .metric-detail,
+.metric-card > .trend-pill { grid-column: 1; }
 
 .metric-card.emphasis {
   background:
@@ -390,9 +409,16 @@ h2 {
 }
 
 .stress-card {
-  display: grid;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 4px 8px;
 }
+.stress-card > .stress-head,
+.stress-card > .stress-bar,
+.stress-card > .stress-scale,
+.stress-card > .metric-detail { grid-column: 1 / -1; }
+.stress-card > .stress-label { grid-column: 1; grid-row: 4; }
+.stress-card > .baseline-note { grid-column: 2; grid-row: 4; text-align: right; align-self: center; }
+.stress-card .metric-detail { line-height: 1.35; }
 
 .stress-head {
   display: flex;
@@ -462,7 +488,7 @@ h2 {
 }
 
 .metric-value {
-  font-size: clamp(2rem, 4vw, 2.8rem);
+  font-size: 2rem;
   line-height: 1;
   letter-spacing: -0.05em;
   font-weight: 700;
@@ -482,7 +508,7 @@ h2 {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
+  padding: 4px 8px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.03);
   color: rgba(225, 233, 243, 0.92);
@@ -521,69 +547,79 @@ h2 {
 
 .controls-panel {
   display: grid;
-  gap: 14px;
+  align-content: center;
+  gap: 8px;
 }
-
-.setup-panel {
-  display: grid;
-  gap: 14px;
-}
-
-.setup-card {
-  display: grid;
-  grid-template-columns: minmax(260px, 0.95fr) minmax(0, 1.05fr);
-  gap: 16px;
-  align-items: center;
-  border-radius: var(--radius-md);
+.setup-panel { display: block; }
+.setup-card { display: grid; gap: 7px; }
+.setup-panel .panel-head { align-items: center; }
+.setup-image-button {
+  position: relative;
+  width: 56px;
+  flex: 0 0 56px;
+  padding: 0;
+  border-radius: 12px;
   border: 1px solid var(--border);
-  background: rgba(10, 16, 25, 0.86);
-  padding: 14px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.02);
+  cursor: zoom-in;
+  overflow: hidden;
 }
-
 .setup-image {
   display: block;
   width: 100%;
-  height: 100%;
-  max-height: 240px;
-  object-fit: cover;
-  object-position: center top;
-  border-radius: 16px;
-  border: 1px solid rgba(138, 160, 186, 0.12);
-  background: rgba(255, 255, 255, 0.02);
+  height: 56px;
+  object-fit: contain;
 }
-
-.setup-copy {
-  display: grid;
-  gap: 10px;
+.setup-expand-icon {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 22px;
+  height: 22px;
+  padding: 3px;
+  border-radius: 5px;
+  color: var(--text);
+  background: var(--bg-1);
 }
-
+.setup-copy { display: contents; }
 .setup-text {
   color: rgba(226, 234, 243, 0.92);
-  font-size: 0.94rem;
-  line-height: 1.45;
+  font-size: 0.86rem;
+  line-height: 1.4;
 }
-
 .setup-list {
+  grid-column: 1 / -1;
   margin: 0;
-  padding-left: 18px;
+  padding-left: 17px;
   color: rgba(177, 191, 209, 0.9);
-  font-size: 0.9rem;
-  line-height: 1.5;
+  font-size: 0.84rem;
+  line-height: 1.42;
 }
-
-.button-group {
+.setup-list li + li { margin-top: 3px; }
+.button-group { display: grid; gap: 8px; }
+.baseline-buttons, .measurement-buttons {
   display: grid;
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
+.control-note {
+  color: var(--muted);
+  font-size: 0.79rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.control-status:empty { display: none; }
 
 .action-button {
   appearance: none;
   width: 100%;
   border: 0;
   border-radius: 16px;
-  padding: 14px 18px;
+  padding: 11px 12px;
+  min-height: 44px;
   font: inherit;
+  font-size: 0.88rem;
+  line-height: 1.35;
   font-weight: 600;
   color: var(--text);
   cursor: pointer;
@@ -620,6 +656,11 @@ h2 {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
+.timer-panel {
+  display: grid;
+  align-items: center;
+  padding: 12px;
+}
 .countdown-card {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -764,118 +805,92 @@ h2 {
   }
 }
 
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+button[hidden] { display: none; }
+.measurement-buttons:has(#cancelCalibrationButton:not([hidden])) #measureButton { display: none; }
+.setup-dialog {
+  width: min(820px, calc(100% - 32px));
+  max-height: calc(100svh - 40px);
+  padding: 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  background: var(--panel-strong);
+  box-shadow: var(--shadow);
+  overflow: auto;
+}
+.setup-dialog::backdrop { background: rgba(3, 6, 12, 0.82); }
+.setup-dialog-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.setup-dialog-close { width: auto; }
+.setup-dialog > img { display: block; width: 100%; height: auto; }
+
 @media (max-width: 1100px) {
-  .app-shell {
-    min-height: 100vh;
-  }
-
-  .dashboard {
-    grid-template-columns: 1fr;
-  }
-
-  .main-column {
-    grid-template-columns: 1fr;
-  }
-
-  .chart-panel {
-    min-height: 540px;
-  }
-
-  .side-panel {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-rows: none;
-  }
+  .dashboard { grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr); }
+  .lower-controls { grid-template-columns: minmax(0, 1fr); }
+  .chart-panel { min-height: 370px; }
 }
-
 @media (max-width: 860px) {
-  .app-shell {
-    width: min(1400px, calc(100% - 28px));
-    padding-top: 18px;
+  .app-shell { width: calc(100% - 28px); padding-top: 18px; }
+  .topbar { flex-direction: column; align-items: flex-start; }
+  .dashboard {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "chart" "readings" "controls" "timer";
   }
-
-  .topbar {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .side-panel {
-    grid-template-columns: 1fr;
-  }
-
-  .chart-stage {
-    grid-template-columns: 38px minmax(0, 1fr);
-  }
-
-  .chart-x-axis {
-    padding-left: 48px;
-  }
-
-  .countdown-card {
-    grid-template-columns: 1fr;
-    justify-items: center;
-    text-align: center;
-  }
+  .metric-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .metric-card { grid-template-columns: minmax(0, 1fr); }
+  .metric-card > .metric-row { grid-column: 1; grid-row: auto; }
+  .lower-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .chart-stage { grid-template-columns: 38px minmax(0, 1fr); }
+  .chart-x-axis { padding-left: 50px; }
+  .countdown-card { grid-template-columns: auto minmax(0, 1fr); }
 }
-
 @media (max-width: 640px) {
-  .chart-panel,
-  .metric-panel,
-  .controls-panel,
-  .setup-panel,
-  .summary-panel {
-    padding: 18px;
-  }
-
-  .panel-head,
-  .stream-meta {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .brand-assets {
-    gap: 10px;
-  }
-
-  .brand-icon {
-    width: 38px;
-    height: 38px;
-  }
-
-  .brand-logo {
-    width: min(55vw, 210px);
-  }
-
-  .setup-card {
-    grid-template-columns: 1fr;
-  }
-
-  .setup-image {
-    max-height: none;
-    height: auto;
-  }
-
-  .chart-stage {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-
-  .chart-y-axis {
-    flex-direction: row;
-    padding: 0 4px;
-  }
-
-  .chart-x-axis {
-    padding: 10px 2px 0;
-  }
-
-  .meta-stack {
-    align-items: flex-start;
-    text-align: left;
-  }
-
-  .summary-grid {
-    grid-template-columns: 1fr;
-  }
+  .chart-panel, .metric-panel, .controls-panel, .setup-panel, .summary-panel { padding: 14px; }
+  .panel-head { gap: 12px; }
+  .stream-meta { flex-direction: column; align-items: flex-end; gap: 8px; }
+  .meta-chip { padding: 7px 9px; font-size: 0.8rem; }
+  .meta-label { font-size: 0.72rem; }
+  .brand-assets { gap: 10px; }
+  .brand-icon { width: 38px; height: 38px; }
+  .brand-logo { width: min(55vw, 210px); }
+  .lower-controls { grid-template-columns: minmax(0, 1fr); }
+  .chart-panel { min-height: 380px; }
+  .chart-stage { grid-template-columns: 28px minmax(0, 1fr); gap: 6px; }
+  .chart-x-axis { padding-left: 34px; }
+  .chart-overlay { padding: 14px; font-size: 0.8rem; text-align: center; line-height: 1.5; }
+  .metric-value { font-size: 1.85rem; }
+  .metric-detail { font-size: 0.88rem; line-height: 1.4; }
+  .stress-card { grid-column: 1 / -1; }
+  .metric-card.emphasis { grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) auto; }
+  .metric-card.emphasis > .metric-row { grid-column: 2; grid-row: 1 / span 2; }
+  .setup-card { gap: 10px; }
+  .setup-image-button { width: 64px; flex-basis: 64px; }
+  .setup-image { height: 64px; }
+  .setup-text, .setup-list { font-size: 0.9rem; line-height: 1.5; }
+  .setup-list li + li { margin-top: 5px; }
+  .summary-grid { gap: 8px; }
+  .summary-card { padding: 10px; }
+  .summary-label { font-size: 0.72rem; letter-spacing: 0.02em; }
+  .setup-dialog { padding: 12px; }
+  .setup-dialog-head { flex-wrap: wrap; }
+}
+@media (max-width: 360px) {
+  .metric-panel { grid-template-columns: minmax(0, 1fr); }
+  .metric-card:not(.stress-card) { grid-template-columns: minmax(0, 1fr) auto; }
+  .metric-card:not(.stress-card) > .metric-row { grid-column: 2; grid-row: 1 / span 2; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body, .action-button { transition: none; }
+  .status-dot { animation: none; }
 }
 
 .connection-controls {

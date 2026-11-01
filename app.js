@@ -11,6 +11,8 @@ const RING_CIRCUMFERENCE = Math.PI * 104
 const IDLE_BASELINE = 0
 const DISCONNECTED_TEMPERATURE = 0
 const IDLE_TEMPERATURE = 36.58
+const BASELINE_STORAGE_KEY = "neurofront.baseline.v1"
+const CALCULATION_VERSION = "neurofront-legacy-1"
 
 const refs = {
   statusPill: document.getElementById("statusPill"),
@@ -32,6 +34,12 @@ const refs = {
   connectButton: document.getElementById("connectButton"),
   measureButton: document.getElementById("measureButton"),
   exportButton: document.getElementById("exportButton"),
+  recalibrateButton: document.getElementById("recalibrateButton"),
+  savedBaselineButton: document.getElementById("savedBaselineButton"),
+  cancelCalibrationButton: document.getElementById("cancelCalibrationButton"),
+  savedBaselineInfo: document.getElementById("savedBaselineInfo"),
+  baselineActionStatus: document.getElementById("baselineActionStatus"),
+  countdownLabel: document.getElementById("countdownLabel"),
   countdownCard: document.getElementById("countdownCard"),
   countdownRing: document.getElementById("countdownRing"),
   countdownValue: document.getElementById("countdownValue"),
@@ -98,6 +106,8 @@ const state = {
     peakToPeak: 0,
     derivativeMean: 0
   },
+  savedBaseline: null,
+  calibration: { active: false, startTime: 0, samples: [], holdTimer: false },
   stress: {
     score: 50,
     label: "Baseline",
@@ -195,7 +205,7 @@ function isDeviceConnected() {
 }
 
 function canStartMeasurement() {
-  return Boolean(state.characteristic && isDeviceConnected() && state.baseline.ready)
+  return Boolean(state.characteristic && isDeviceConnected() && state.baseline.ready && !state.calibration.active)
 }
 
 function setStatus(status) {
@@ -238,27 +248,35 @@ function updateStressMeter(score, label, feedback, note) {
 }
 
 function refreshStressState(sampleWindow) {
-  if (!state.baseline.ready) {
-    const collectedSeconds = Math.min(state.baseline.samples.length / BASELINE_SAMPLE_COUNT, 1) * (BASELINE_MS / 1000)
-    const remainingSeconds = Math.max(0, BASELINE_MS / 1000 - collectedSeconds)
-    const feedback = isDeviceConnected()
-      ? `Sit relaxed while baseline calibrates. About ${remainingSeconds.toFixed(1)} seconds remaining.`
-      : "Connect and sit relaxed for 20 seconds to calibrate your session baseline."
+  if (state.calibration.active) {
+    const remainingSeconds = Math.max(0, (BASELINE_MS - (performance.now() - state.calibration.startTime)) / 1000)
+    const feedback = `Sit relaxed while baseline calibrates. About ${remainingSeconds.toFixed(1)} seconds remaining.`
     state.stress.score = 50
     state.stress.label = "Calibrating"
     state.stress.feedback = feedback
     updateStressMeter(50, "Calibrating", feedback, "Baseline target: 50/100")
     return
   }
+  if (!state.baseline.ready) {
+    const feedback = isDeviceConnected()
+      ? "Choose Recalibrate or Use Saved Baseline before measuring."
+      : "Connect your device, then choose a baseline."
+    state.stress.score = 50
+    state.stress.label = "Choose a baseline"
+    state.stress.feedback = feedback
+    updateStressMeter(50, state.stress.label, feedback, "Baseline target: 50/100")
+    return
+  }
   if (!sampleWindow.length) {
     state.stress.score = 50
     state.stress.label = "Baseline Ready"
-    state.stress.feedback = "Personal baseline saved for this session."
-    updateStressMeter(50, "Baseline Ready", "Personal baseline saved for this session.", "Baseline locked until refresh or close.")
+    state.stress.feedback = "Personal baseline ready for this session."
+    updateStressMeter(50, "Baseline Ready", state.stress.feedback, "Baseline is ready for measurement.")
     return
   }
   const current = computeSignalFeatures(sampleWindow)
-  const baselineActivity = Math.max(1, compositeActivity(state.baseline))
+  const baseline = state.measurement.baseline || state.baseline
+  const baselineActivity = Math.max(1, compositeActivity(baseline))
   const currentActivity = compositeActivity(current)
   const relativeDelta = (currentActivity - baselineActivity) / baselineActivity
   const score = clamp(50 + relativeDelta * 38, 0, 100)
@@ -322,7 +340,7 @@ function resetLiveSessionState() {
 function setMeasurementIdle() {
   refs.countdownCard.classList.remove("is-running")
   refs.measureButton.disabled = !canStartMeasurement()
-  window.NeuroFrontI18n.setText(refs.measureButton, state.baseline.ready ? "Start Measurement" : "Calibrating Baseline")
+  window.NeuroFrontI18n.setText(refs.measureButton, "Start Measurement")
 }
 
 function renderSummary() {
@@ -340,15 +358,126 @@ function renderSummary() {
 }
 
 function captureBaselineSample(value) {
-  if (state.baseline.ready || state.measurement.active) {
+  if (!state.calibration.active || state.measurement.active) {
     return
   }
-  state.baseline.samples.push(value)
-  if (state.baseline.samples.length < BASELINE_SAMPLE_COUNT) {
+  if (state.calibration.samples.length < BASELINE_SAMPLE_COUNT) {
+    state.calibration.samples.push(value)
+  }
+}
+
+function validateSavedBaseline(record) {
+  if (!record || record.schemaVersion !== 1 || record.calculationVersion !== CALCULATION_VERSION ||
+      record.deviceName !== DEVICE_NAME || record.serviceUuid !== SERVICE_UUID || record.characteristicUuid !== CHAR_UUID ||
+      record.unit !== "uV" || record.sampleIntervalMs !== SAMPLE_INTERVAL || record.calibrationDurationMs !== BASELINE_MS ||
+      !Number.isFinite(Date.parse(record.createdAt)) || !Array.isArray(record.samples) ||
+      record.samples.length !== BASELINE_SAMPLE_COUNT || !record.samples.every(Number.isFinite)) return false
+  const features = computeSignalFeatures(record.samples)
+  return Object.entries(features).every(([key, value]) => Number.isFinite(value) &&
+    Number.isFinite(record.features?.[key]) && Math.abs(value - record.features[key]) <= 1e-9)
+}
+
+function updateSavedBaselineInfo() {
+  if (!state.savedBaseline) {
+    window.NeuroFrontI18n.setText(refs.savedBaselineInfo, "No saved baseline yet.")
     return
   }
-  state.baseline.samples = state.baseline.samples.slice(0, BASELINE_SAMPLE_COUNT)
-  Object.assign(state.baseline, computeSignalFeatures(state.baseline.samples), { ready: true })
+  const date = new Intl.DateTimeFormat(document.documentElement.lang, { dateStyle: "short", timeStyle: "short" })
+    .format(new Date(state.savedBaseline.createdAt))
+  window.NeuroFrontI18n.setMessage(refs.savedBaselineInfo, "baseline.savedAt", { date })
+}
+
+function loadSavedBaseline() {
+  try {
+    const stored = localStorage.getItem(BASELINE_STORAGE_KEY)
+    if (stored) {
+      const record = stored.length < 100000 ? JSON.parse(stored) : null
+      if (validateSavedBaseline(record)) state.savedBaseline = record
+      else window.NeuroFrontI18n.setText(refs.baselineActionStatus, "Saved baseline is incompatible or damaged. Please recalibrate.")
+    }
+  } catch {
+    window.NeuroFrontI18n.setText(refs.baselineActionStatus, "Saved baselines are unavailable in this browser. You can still recalibrate.")
+  }
+  updateSavedBaselineInfo()
+}
+
+function setBaselineTimer(seconds, progress, label, status) {
+  refs.countdownValue.textContent = seconds.toFixed(1)
+  refs.countdownRing.style.strokeDashoffset = `${RING_CIRCUMFERENCE * progress}`
+  window.NeuroFrontI18n.setText(refs.countdownLabel, label)
+  window.NeuroFrontI18n.setText(refs.measurementState, status)
+}
+
+function startCalibration() {
+  if (!state.characteristic || !isDeviceConnected() || state.measurement.active || state.calibration.active) return
+  state.calibration = { active: true, startTime: performance.now(), samples: [], holdTimer: false }
+  refs.countdownCard.classList.add("is-running")
+  window.NeuroFrontI18n.setText(refs.baselineActionStatus, "Calibrating your baseline")
+  setBaselineTimer(BASELINE_MS / 1000, 0, "Calibration Window", "Calibrating your baseline")
+  updateControlsAvailability(performance.now())
+}
+
+function cancelCalibration(message = "Calibration cancelled. Your previous baseline is unchanged.") {
+  if (!state.calibration.active) return
+  state.calibration.active = false
+  state.calibration.samples = []
+  state.calibration.holdTimer = true
+  refs.countdownCard.classList.remove("is-running")
+  window.NeuroFrontI18n.setText(refs.baselineActionStatus, message)
+  setBaselineTimer(MEASUREMENT_MS / 1000, 0, "Measurement Window", "Ready for 15 second capture")
+  updateControlsAvailability(performance.now())
+}
+
+function useSavedBaseline() {
+  if (!state.savedBaseline || !isDeviceConnected() || state.measurement.active || state.calibration.active) return
+  const record = state.savedBaseline
+  if (!validateSavedBaseline(record)) return
+  state.baseline = { ...record.features, samples: record.samples.slice(), ready: true, createdAt: record.createdAt }
+  state.calibration.holdTimer = true
+  window.NeuroFrontI18n.setText(refs.baselineActionStatus, "Saved baseline selected.")
+  setBaselineTimer(MEASUREMENT_MS / 1000, 0, "Measurement Window", "Baseline ready. Start a measurement when you are ready.")
+  updateControlsAvailability(performance.now())
+}
+
+function updateCalibration(now) {
+  const elapsed = now - state.calibration.startTime
+  const remaining = Math.max(0, (BASELINE_MS - elapsed) / 1000)
+  const status = elapsed < BASELINE_MS ? "Calibrating your baseline" : "Waiting for more signal samples"
+  setBaselineTimer(remaining, Math.min(1, elapsed / BASELINE_MS), "Calibration Window", status)
+  if (elapsed < BASELINE_MS) return
+  if (state.calibration.samples.length < BASELINE_SAMPLE_COUNT || now - state.lastIncomingTime > SIGNAL_TIMEOUT_MS) {
+    if (elapsed >= BASELINE_MS + SIGNAL_TIMEOUT_MS) cancelCalibration("Not enough signal data. Check the contacts and recalibrate.")
+    return
+  }
+  const samples = state.calibration.samples.slice()
+  const features = computeSignalFeatures(samples)
+  if (!Object.values(features).every(Number.isFinite)) {
+    cancelCalibration("Not enough signal data. Check the contacts and recalibrate.")
+    return
+  }
+  const createdAt = new Date().toISOString()
+  const record = {
+    schemaVersion: 1, calculationVersion: CALCULATION_VERSION, deviceName: DEVICE_NAME,
+    serviceUuid: SERVICE_UUID, characteristicUuid: CHAR_UUID, unit: "uV",
+    sampleIntervalMs: SAMPLE_INTERVAL, calibrationDurationMs: BASELINE_MS,
+    createdAt, samples, features
+  }
+  state.baseline = { ...features, samples: samples.slice(), ready: true, createdAt }
+  state.calibration.active = false
+  state.calibration.samples = []
+  state.calibration.holdTimer = true
+  refs.countdownCard.classList.remove("is-running")
+  let message = "Calibration complete. Baseline saved in this browser."
+  try {
+    localStorage.setItem(BASELINE_STORAGE_KEY, JSON.stringify(record))
+    state.savedBaseline = record
+  } catch {
+    message = "Baseline ready, but this browser could not save it."
+  }
+  window.NeuroFrontI18n.setText(refs.baselineActionStatus, message)
+  setBaselineTimer(0, 1, "Calibration Window", message)
+  updateSavedBaselineInfo()
+  updateControlsAvailability(now)
 }
 
 function initChart() {
@@ -511,6 +640,9 @@ function startMeasurement() {
   state.measurement.completed = false
   state.measurement.revealed = true
   state.measurement.startTime = performance.now()
+  state.measurement.baseline = { ...state.baseline, samples: state.baseline.samples.slice() }
+  state.calibration.holdTimer = false
+  window.NeuroFrontI18n.setText(refs.countdownLabel, "Measurement Window")
   state.measurement.samples = []
   state.temperature = IDLE_TEMPERATURE
   state.displayTemperature = IDLE_TEMPERATURE
@@ -527,6 +659,11 @@ function startMeasurement() {
 }
 
 function updateMeasurement(now) {
+  if (state.calibration.active) {
+    updateCalibration(now)
+    return
+  }
+  if (state.calibration.holdTimer) return
   if (!state.measurement.active) {
     refs.countdownRing.style.strokeDasharray = `${RING_CIRCUMFERENCE}`
     refs.countdownRing.style.strokeDashoffset = state.measurement.completed ? `${RING_CIRCUMFERENCE}` : "0"
@@ -669,9 +806,12 @@ function updateChartState(now) {
 }
 
 function updateControlsAvailability(now) {
+  refs.recalibrateButton.disabled = !isDeviceConnected() || !state.characteristic || state.measurement.active || state.calibration.active
+  refs.savedBaselineButton.disabled = !state.savedBaseline || !isDeviceConnected() || !state.characteristic || state.measurement.active || state.calibration.active
+  refs.cancelCalibrationButton.hidden = !state.calibration.active
   refs.measureButton.disabled = state.measurement.active || !canStartMeasurement()
   if (!state.measurement.active) {
-    window.NeuroFrontI18n.setText(refs.measureButton, state.baseline.ready ? "Start Measurement" : "Calibrating Baseline")
+    window.NeuroFrontI18n.setText(refs.measureButton, "Start Measurement")
   }
 }
 
@@ -829,6 +969,7 @@ function exportChartAsPng() {
 }
 
 function handleDisconnect() {
+  if (state.calibration.active) cancelCalibration("Calibration interrupted. Your previous baseline is unchanged.")
   const hasCompletedPreview = state.measurement.completed && state.exportSnapshot.buffer.length
   if (state.characteristic) {
     state.characteristic.removeEventListener("characteristicvaluechanged", handleCharacteristic)
@@ -856,8 +997,8 @@ function handleDisconnect() {
     state.measurement.revealed = true
   }
   window.NeuroFrontI18n.setText(refs.connectButton, "Connect")
-  window.NeuroFrontI18n.setText(refs.measurementState, "Ready for 15 second capture")
-  refs.countdownValue.textContent = "15.0"
+  state.calibration.holdTimer = true
+  setBaselineTimer(MEASUREMENT_MS / 1000, 0, "Measurement Window", "Ready for 15 second capture")
   if (!hasCompletedPreview) {
     refs.summaryPanel.classList.remove("visible")
   }
@@ -945,9 +1086,14 @@ function bindEvents() {
   refs.connectButton.addEventListener("click", connectBluetooth)
   refs.measureButton.addEventListener("click", startMeasurement)
   refs.exportButton.addEventListener("click", exportChartAsPng)
+  refs.recalibrateButton.addEventListener("click", startCalibration)
+  refs.savedBaselineButton.addEventListener("click", useSavedBaseline)
+  refs.cancelCalibrationButton.addEventListener("click", () => cancelCalibration())
+  document.addEventListener("neurofront:languagechange", updateSavedBaselineInfo)
 }
 
 function init() {
+  loadSavedBaseline()
   refs.countdownRing.style.strokeDasharray = `${RING_CIRCUMFERENCE}`
   refs.countdownRing.style.strokeDashoffset = "0"
   initChart()

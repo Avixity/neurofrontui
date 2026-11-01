@@ -45,6 +45,14 @@
     writeText(element, source)
   }
 
+  function setMessage(element, key, values = {}) {
+    textTargets.set(element, { key, values, locale })
+    const text = translate(key, values)
+    if (element.textContent !== text) element.textContent = text
+    if (locale === "ur") element.setAttribute("dir", "auto")
+    else element.removeAttribute("dir")
+  }
+
   function closeMenu(restoreFocus = false) {
     menu.hidden = true
     button.setAttribute("aria-expanded", "false")
@@ -60,7 +68,13 @@
     document.querySelectorAll("[data-i18n-alt]").forEach((element) => {
       element.alt = translate(element.dataset.i18nAlt)
     })
-    for (const [element, entry] of textTargets) setText(element, entry.source)
+    document.querySelectorAll("[data-i18n-aria-label]").forEach((element) => {
+      element.setAttribute("aria-label", translate(element.dataset.i18nAriaLabel))
+    })
+    for (const [element, entry] of textTargets) {
+      if (entry.key) setMessage(element, entry.key, entry.values)
+      else setText(element, entry.source)
+    }
     const nativeName = languages.find(([code]) => code === locale)[1]
     label.textContent = nativeName
     label.lang = locale
@@ -71,6 +85,7 @@
       option.setAttribute("aria-selected", String(selected))
       option.tabIndex = selected ? 0 : -1
     })
+    document.dispatchEvent(new Event("neurofront:languagechange"))
   }
 
   for (const [code, nativeName] of languages) {
@@ -153,7 +168,7 @@
   if ("ResizeObserver" in window) new ResizeObserver(sizeButton).observe(statusPill)
   else window.addEventListener("resize", sizeButton)
 
-  window.NeuroFrontI18n = { setText }
+  window.NeuroFrontI18n = { setText, setMessage }
   applyLanguage()
   sizeButton()
 })()
