@@ -158,15 +158,18 @@
           </div>
         </div>
     </section>
-      <section class="panel summary-panel" id="summaryPanel">
+    <div class="capture-row">
+      <section class="panel summary-panel" id="summaryPanel" aria-labelledby="summaryTitle">
         <div class="panel-head compact">
           <div>
             <p class="eyebrow" data-i18n="session.summary">Session Summary</p>
-            <h2 data-i18n="session.results">Capture Results</h2>
+            <h2 id="summaryTitle" data-i18n="session.results">Capture Results</h2>
           </div>
           <div class="activity-badge" id="activityLabel" data-i18n="activity.stable">Stable</div>
         </div>
-        <div class="summary-grid">
+        <p class="section-empty" id="summaryEmpty" data-i18n="history.summaryEmpty">Complete a measurement to see your capture results.</p>
+        <div id="summaryContent">
+          <div class="summary-grid">
           <div class="summary-card">
             <span class="summary-label" data-i18n="summary.average">Average</span>
             <strong id="avgValue">0.0</strong>
@@ -179,9 +182,35 @@
             <span class="summary-label" data-i18n="summary.minimum">Minimum</span>
             <strong id="minValue">0.0</strong>
           </div>
+          </div>
         </div>
       </section>
-
+      <section class="panel history-panel" aria-labelledby="historyTitle">
+        <div class="panel-head compact">
+          <div>
+            <h2 id="historyTitle" data-i18n="history.title">Capture History</h2>
+            <p class="section-caption" id="historyStorageLabel" data-i18n="history.local">Saved on this device</p>
+          </div>
+        </div>
+        <p class="section-empty" id="historyEmpty" data-i18n="history.empty">Your completed captures will appear here.</p>
+        <ol class="history-list" id="historyList"></ol>
+        <div class="history-status-row">
+          <p class="control-note" id="historyStatus" role="status" aria-live="polite"></p>
+          <button class="action-button ghost compact-button" id="historyRetry" type="button" hidden data-i18n="history.retry">Retry</button>
+        </div>
+        <button class="action-button ghost history-load-more" id="historyLoadMore" type="button" hidden data-i18n="history.loadMore">Load More</button>
+        <p class="history-storage-note control-note" data-i18n="history.storageNote">Captures stay in this browser on this device.</p>
+      </section>
+    </div>
+    <section class="panel resources-panel" id="resourcesPanel" aria-labelledby="resourcesTitle">
+      <div class="panel-head">
+        <div>
+          <h2 id="resourcesTitle" data-i18n="resources.title">Educational Resources</h2>
+          <p class="section-caption" data-i18n="resources.subtitle">Practical guides to your device, signals and personal baseline.</p>
+        </div>
+      </div>
+      <div class="resource-grid" id="resourceGrid"></div>
+    </section>
   </main>
   <p class="page-disclaimer" data-i18n="disclaimer">This should not be taken as a proper medical diagnosis.</p>
 </div>
@@ -213,10 +242,72 @@
   </div>
 </dialog>
 
+<dialog class="content-dialog capture-dialog" id="captureDialog" aria-labelledby="captureDialogTitle">
+  <div class="setup-dialog-head">
+    <div>
+      <h2 id="captureDialogTitle" data-i18n="history.details">Capture Details</h2>
+      <p class="section-caption" id="captureDate"></p>
+    </div>
+    <button class="setup-dialog-close action-button ghost" id="captureClose" type="button" aria-label="Close" data-i18n-aria-label="common.close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg>
+    </button>
+  </div>
+  <div class="capture-result-head">
+    <div>
+      <span class="summary-label" data-i18n="stress.meter">Stress Meter</span>
+      <div class="capture-score-row"><strong id="captureScore"></strong><span id="captureCategory"></span></div>
+    </div>
+    <div class="activity-badge" id="captureActivity"></div>
+  </div>
+  <div class="summary-grid capture-stats">
+    <div class="summary-card"><span class="summary-label" data-i18n="summary.average">Average</span><strong id="captureAverage"></strong></div>
+    <div class="summary-card"><span class="summary-label" data-i18n="summary.peak">Peak</span><strong id="capturePeak"></strong></div>
+    <div class="summary-card"><span class="summary-label" data-i18n="summary.minimum">Minimum</span><strong id="captureMinimum"></strong></div>
+  </div>
+  <p class="capture-duration"><span data-i18n="history.duration">Measurement duration</span><strong id="captureDuration"></strong></p>
+  <figure class="capture-figure">
+    <figcaption id="captureGraphCaption" data-i18n="history.graph">Recorded graph</figcaption>
+    <div class="capture-plot-scroll" tabindex="0" role="region" aria-labelledby="captureGraphCaption">
+      <svg class="capture-graph" id="captureGraph" role="img" aria-label="Recorded graph" data-i18n-aria-label="history.graph" viewBox="0 0 720 300"></svg>
+    </div>
+  </figure>
+  <section class="capture-baseline" aria-labelledby="captureBaselineTitle">
+    <div class="capture-baseline-head"><h3 id="captureBaselineTitle" data-i18n="history.baseline">Baseline used</h3><span id="captureBaselineDate"></span></div>
+    <p class="control-note baseline-reference-note" data-i18n="history.referenceOnly">This is the baseline saved with this capture.</p>
+    <figure class="capture-figure baseline-figure">
+      <figcaption id="captureBaselineGraphCaption" data-i18n="history.reference">Baseline reference trace</figcaption>
+      <div class="capture-plot-scroll" tabindex="0" role="region" aria-labelledby="captureBaselineGraphCaption">
+        <svg class="capture-graph baseline-graph" id="captureBaselineGraph" role="img" aria-label="Baseline reference trace" data-i18n-aria-label="history.reference" viewBox="0 0 720 300"></svg>
+      </div>
+    </figure>
+    <dl class="capture-features" id="captureBaselineFeatures"></dl>
+  </section>
+  <div class="capture-dialog-actions"><button class="action-button ghost" id="captureExport" type="button" data-i18n="export.png">Export PNG</button></div>
+</dialog>
+
+<dialog class="content-dialog resource-dialog" id="resourceDialog" aria-labelledby="resourceDialogTitle" aria-describedby="resourceDialogDescription">
+  <div class="setup-dialog-head">
+    <h2 id="resourceDialogTitle"></h2>
+    <button class="setup-dialog-close action-button ghost" id="resourceClose" type="button" aria-label="Close" data-i18n-aria-label="common.close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg>
+    </button>
+  </div>
+  <p class="resource-description" id="resourceDialogDescription"></p>
+  <div class="resource-body" id="resourceDialogBody"></div>
+  <section class="resource-sources">
+    <h3 data-i18n="resources.sources">Sources</h3>
+    <div id="resourceSources"></div>
+  </section>
+</dialog>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="language-data.js" defer></script>
+<script src="capture-language.js" defer></script>
+<script src="resource-data.js" defer></script>
 <script src="language.js" defer></script>
 <script src="app.js" defer></script>
 <script src="setup-viewer.js" defer></script>
+<script src="capture-history.js" defer></script>
+<script src="resources.js" defer></script>
 </body>
 </html>

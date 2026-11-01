@@ -602,6 +602,7 @@ function recordMeasurementSample(value) {
 }
 
 function finalizeMeasurement() {
+  if (!state.measurement.active) return
   state.measurement.active = false
   state.measurement.completed = true
   state.measurement.revealed = true
@@ -640,6 +641,30 @@ function finalizeMeasurement() {
   renderSummary()
   refs.summaryPanel.classList.add("visible")
   refreshStressState(samples)
+  window.NeuroFrontHistory?.record({
+    id: state.measurement.id,
+    schemaVersion: 1,
+    calculationVersion: CALCULATION_VERSION,
+    startedAt: state.measurement.startedAt,
+    completedAt: new Date().toISOString(),
+    durationMs: MEASUREMENT_MS,
+    sampleIntervalMs: SAMPLE_INTERVAL,
+    unit: "uV",
+    samples: samples.slice(),
+    axisMin: state.exportSnapshot.axisMin,
+    axisMax: state.exportSnapshot.axisMax,
+    stress: { ...state.stress },
+    summary: { ...state.summary },
+    baseline: {
+      ...state.measurement.baseline,
+      samples: state.measurement.baseline.samples.slice(),
+      durationMs: BASELINE_MS,
+      sampleIntervalMs: SAMPLE_INTERVAL,
+      unit: "uV",
+      calculationVersion: CALCULATION_VERSION
+    },
+    device: { name: DEVICE_NAME, serviceUuid: SERVICE_UUID, characteristicUuid: CHAR_UUID }
+  })
   resetLiveSessionState()
   updateControlsAvailability(performance.now())
 }
@@ -667,6 +692,8 @@ function startMeasurement() {
   state.measurement.completed = false
   state.measurement.revealed = true
   state.measurement.startTime = performance.now()
+  state.measurement.startedAt = new Date().toISOString()
+  state.measurement.id = window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
   state.measurement.baseline = { ...state.baseline, samples: state.baseline.samples.slice() }
   state.calibration.holdTimer = false
   window.NeuroFrontI18n.setText(refs.countdownLabel, "Measurement Window")
@@ -900,7 +927,7 @@ function animationLoop(now) {
   requestAnimationFrame(animationLoop)
 }
 
-function drawExportChart(ctx, width, height, buffer, axisMin, axisMax) {
+function drawExportChart(ctx, width, height, buffer, axisMin, axisMax, axisLabels = null, pointCount = BUFFER_SIZE) {
   const outerPad = 72
   const plotLeft = outerPad + 42
   const plotRight = width - 48
@@ -953,10 +980,10 @@ function drawExportChart(ctx, width, height, buffer, axisMin, axisMax) {
   ctx.font = "500 24px Inter, system-ui, sans-serif"
   ctx.textAlign = "center"
   ctx.textBaseline = "top"
-  ctx.fillText(refs.xAxisStart.textContent, plotLeft + 12, plotBottom + 20)
-  ctx.fillText(refs.xAxisQuarter.textContent, plotLeft + plotWidth * 0.33, plotBottom + 20)
-  ctx.fillText(refs.xAxisHalf.textContent, plotLeft + plotWidth * 0.66, plotBottom + 20)
-  ctx.fillText(refs.xAxisEnd.textContent, plotRight - 12, plotBottom + 20)
+  ctx.fillText(axisLabels?.[0] ?? refs.xAxisStart.textContent, plotLeft + 12, plotBottom + 20)
+  ctx.fillText(axisLabels?.[1] ?? refs.xAxisQuarter.textContent, plotLeft + plotWidth * 0.33, plotBottom + 20)
+  ctx.fillText(axisLabels?.[2] ?? refs.xAxisHalf.textContent, plotLeft + plotWidth * 0.66, plotBottom + 20)
+  ctx.fillText(axisLabels?.[3] ?? refs.xAxisEnd.textContent, plotRight - 12, plotBottom + 20)
 
   ctx.save()
   ctx.beginPath()
@@ -971,7 +998,7 @@ function drawExportChart(ctx, width, height, buffer, axisMin, axisMax) {
   ctx.shadowBlur = 18
   ctx.beginPath()
   for (let index = 0; index < points.length; index += 1) {
-    const x = plotLeft + (index / Math.max(1, BUFFER_SIZE - 1)) * plotWidth
+    const x = plotLeft + (index / Math.max(1, pointCount - 1)) * plotWidth
     const y = plotTop + (1 - (points[index] - safeMin) / span) * plotHeight
     if (index === 0) {
       ctx.moveTo(x, y)
