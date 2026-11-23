@@ -62,7 +62,7 @@
     updateControlsAvailability(now)
     render(now)
   }
-  function cancel(reason = "cancelled", now = performance.now()) {
+  function cancel(reason = "discardGeneric", now = performance.now()) {
     if (!run) return
     const focused = document.activeElement === ui.adaptiveStop
     result = null
@@ -78,17 +78,20 @@
     ui.adaptiveCoverage.hidden = true
     ui.adaptiveSaveStatus.hidden = true
   }
-  function reset() {
+  function reset(reason = "") {
+    const interruptedByAccountChange = busy() && reason === "discardAccount"
     run = null
     clearResult()
-    ui.modeSelect.value = choice = "standard"
+    if (interruptedByAccountChange) message = reason
+    ui.modeSelect.value = choice = interruptedByAccountChange ? "adaptive" : "standard"
     ui.adaptiveDuration.value = "unlimited"
     ui.adaptiveCustomMinutes.value = "15"
-    ui.adaptivePanel.hidden = true
+    ui.adaptivePanel.hidden = !selected()
     window.NeuroFrontI18n.setText(ui.adaptiveCoverage, "")
     window.NeuroFrontI18n.setText(ui.adaptiveStatus, "")
     timer(0)
-    document.body.classList.remove("mode-adaptive", "adaptive-calibrating")
+    document.body.classList.toggle("mode-adaptive", selected())
+    document.body.classList.remove("adaptive-calibrating")
     render()
   }
   function begin() {
@@ -96,7 +99,7 @@
     if (run || !selected() || limit === null || !ready(now)) return
     const baseline = Object.fromEntries(["mean", "rms", "stdDev", "peakToPeak", "derivativeMean"].map(k => [k, state.baseline[k]]))
     if (!Object.values(baseline).every(Number.isFinite) || !(baseline.peakToPeak > 0)) {
-      clearResult(); message = "invalid"; render(now); return
+      clearResult(); message = "adaptiveBaselineInvalid"; render(now); return
     }
     clearResult()
     const wall = Date.now()
@@ -109,19 +112,26 @@
   }
   function validRun(now) {
     if (!run) return false
-    if (owner() !== run.owner || !state.baseline.ready || state.baseline.createdAt !== run.reference) { cancel("changed", now); return false }
-    if (document.hidden) { cancel("visibility", now); return false }
+    if (owner() !== run.owner) { cancel("discardAccount", now); return false }
+    if (!state.baseline.ready || state.baseline.createdAt !== run.reference) { cancel("discardBaseline", now); return false }
+    if (document.hidden) { cancel("discardVisibility", now); return false }
     const wallGap = Date.now() - run.lastPacketWall
-    if (wallGap < 0 || wallGap > maxGapMs || !isDeviceConnected() || !state.characteristic || state.characteristic !== run.characteristic ||
-        now < run.lastPacket || now - run.lastPacket > maxGapMs) { cancel("lost", now); return false }
+    if (!isDeviceConnected() || !state.characteristic || state.characteristic !== run.characteristic) {
+      cancel("discardDisconnected", now); return false
+    }
+    if (wallGap < 0 || wallGap > maxGapMs || now < run.lastPacket || now - run.lastPacket > maxGapMs) {
+      cancel("discardStale", now); return false
+    }
     return true
   }
   function closeWindow(now) {
     const values = run.values.filter(Number.isFinite)
-    if (values.length < slots * .8 || run.first > maxGapMs || run.last === null || windowMs - run.last > maxGapMs ||
-        Math.min(...values) === Math.max(...values)) { cancel("invalid", now); return false }
+    if (values.length < slots * .8 || run.first > maxGapMs || run.last === null || windowMs - run.last > maxGapMs) {
+      cancel("discardSparse", now); return false
+    }
+    if (Math.min(...values) === Math.max(...values)) { cancel("discardFlat", now); return false }
     const score = estimateWindowScore(values, run.baseline)
-    if (!Number.isFinite(score) || score < 0 || score > 100) { cancel("invalid", now); return false }
+    if (!Number.isFinite(score) || score < 0 || score > 100) { cancel("discardInvalid", now); return false }
     run.index++
     run.mean += (score - run.mean) / run.index
     run.values = new Array(slots)
@@ -130,7 +140,7 @@
   }
   function finish(now, requestedStop) {
     const duration = Math.floor(Math.min(now - run.start, run.limit || Infinity))
-    if (!run.index) { cancel("tooShort", now); return }
+    if (!run.index) { cancel("discardTooShort", now); return }
     const count = run.index
     const score = Math.round(run.mean)
     const saved = window.NeuroFrontAdaptiveHistory?.save({
@@ -163,7 +173,7 @@
   function sample(value, now, rawValue) {
     if (!run) return
     if (!Number.isFinite(value) || !/^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[-+]?\d+)?$/i.test(rawValue.trim())) {
-      cancel("invalid", now); return
+      cancel("discardInvalid", now); return
     }
     if (!advance(now)) return
     const inside = now - run.start - run.index * windowMs
@@ -201,13 +211,13 @@
   ui.adaptiveCustomMinutes.addEventListener("input", updateDuration)
   ui.adaptiveStart.addEventListener("click", begin)
   ui.adaptiveStop.addEventListener("click", stop)
-  document.addEventListener("visibilitychange", () => { if (document.hidden) cancel("visibility") })
+  document.addEventListener("visibilitychange", () => { if (document.hidden) cancel("discardVisibility") })
   document.addEventListener("neurofront:languagechange", () => {
     if (!result) return
     result = { ...result, duration: window.NeuroFrontAdaptiveHistory.formatDuration(result.count * windowMs) }
     window.NeuroFrontI18n.setMessage(ui.adaptiveCoverage, "dash.coverageElapsed", result)
   })
-  window.addEventListener("pagehide", () => cancel("visibility"))
+  window.addEventListener("pagehide", () => cancel("discardVisibility"))
   window.NeuroFrontAdaptive = Object.freeze({ selected, busy, sample, tick, cancel, reset })
   reset()
 })()

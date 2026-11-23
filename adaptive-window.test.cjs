@@ -64,8 +64,13 @@ test("10-minute estimate averages forty original-model calls and retains at most
   assert.equal(f.archive[0].record.durationMs,600000)
   assert.equal(f.archive[0].record.type,"adaptive")
 })
-test("sparse, flat, stale, stopped, and account-switched inputs never yield an estimate", () => {
-  for (const kind of ["sparse","flat","stale","sleep","stop","owner","reset","disconnect","hidden","malformed"]) {
+test("each rejected input has the right reason and yields no estimate or saved capture", () => {
+  const cases = {
+    sparse:"discardSparse", flat:"discardFlat", stale:"discardStale", sleep:"discardStale",
+    stop:"discardTooShort", owner:"discardAccount", baseline:"discardBaseline", reset:"",
+    disconnect:"discardDisconnected", reconnect:"discardReconnecting", hidden:"discardVisibility", malformed:"discardInvalid"
+  }
+  for (const [kind, expected] of Object.entries(cases)) {
     const f=fixture(), start=f.start()
     if (kind==="sparse" || kind==="flat") {
       const stride=kind==="sparse"?200:50
@@ -75,12 +80,14 @@ test("sparse, flat, stale, stopped, and account-switched inputs never yield an e
     else if(kind==="sleep"){f.sleep(); f.at(start+5,1)}
     else if(kind==="stop") f.el("adaptiveStop").click()
     else if(kind==="owner"){f.switchUser();f.at(start+100)}
+    else if(kind==="baseline"){f.state.baseline.createdAt="other";f.at(start+100)}
     else if(kind==="reset")f.api.reset()
     else if(kind==="disconnect"){f.disconnect();f.at(start+100)}
+    else if(kind==="reconnect")f.api.cancel("discardReconnecting")
     else if(kind==="hidden"){f.document.hidden=true;f.events.get("visibilitychange")()}
     else f.api.sample(1,start+10,"1broken")
     assert.equal(f.api.busy(),false,kind)
-    assert.notEqual(f.el("adaptiveStatus").textContent,"dash.completed",kind)
+    assert.equal(f.el("adaptiveStatus").textContent,expected ? "dash."+expected : "",kind)
     assert.ok(f.el("adaptiveCoverage").hidden,kind)
     assert.equal(f.calls.length,0,kind)
     assert.equal(f.archive.length,0,kind)
@@ -148,4 +155,35 @@ test("custom duration strictly validates whole minutes from 1 to 60 and snapshot
   assert.deepEqual(JSON.parse(JSON.stringify(f.archive[0].record)),{
     type:"adaptive", completedAt:1234567890000, durationMs:60000, presetMs:60000, end:"timer", count:4, score:50, custom:true
   })
+})
+test("account reset keeps an active interruption visible but clears the timer and personal settings", () => {
+  const f=fixture(), start=f.start(0,"37")
+  f.at(start+110,2)
+  f.switchUser()
+  f.api.reset("discardAccount")
+  assert.equal(f.api.busy(),false)
+  assert.equal(f.api.selected(),true)
+  assert.equal(f.el("adaptivePanel").hidden,false)
+  assert.equal(f.el("adaptiveStatus").textContent,"dash.discardAccount")
+  assert.equal(f.el("adaptiveTime").textContent,"00:00")
+  assert.equal(f.el("adaptiveDuration").value,"unlimited")
+  assert.equal(f.el("adaptiveCustomMinutes").value,"15")
+  assert.equal(f.archive.length,0)
+  f.api.reset("discardAccount")
+  assert.equal(f.api.selected(),false)
+  assert.equal(f.el("adaptiveStatus").textContent,"")
+})
+test("every actionable discard explanation is localized in all supported languages", () => {
+  const locales=["en","hi","mr","bn","ta","te","kn","ml","gu","pa","or","as","ur"]
+  const dictionaries=Object.fromEntries(locales.map(locale=>[locale,{}]))
+  vm.runInNewContext(fs.readFileSync(__dirname+"/dashboard-language.js","utf8"),{window:{NEUROFRONT_TRANSLATIONS:dictionaries}})
+  const keys=["discardDisconnected","discardReconnecting","discardStale","discardInvalid","discardSparse","discardFlat",
+    "discardVisibility","discardTooShort","discardAccount","discardBaseline","adaptiveBaselineInvalid","discardGeneric"]
+  for(const locale of locales) {
+    for(const name of keys) {
+      const key="dash."+name
+      assert.ok(dictionaries[locale][key]?.length > 15,locale+" "+key)
+      if(locale!=="en") assert.notEqual(dictionaries[locale][key],dictionaries.en[key],locale+" "+key)
+    }
+  }
 })

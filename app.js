@@ -1185,7 +1185,7 @@ let connectionEpoch = 0
 function handleDisconnect(event) {
   if (event?.target && event.target !== state.device) return
   connectionEpoch++
-  window.NeuroFrontAdaptive?.cancel("lost")
+  window.NeuroFrontAdaptive?.cancel("discardDisconnected")
   if (state.calibration.active) cancelCalibration("Calibration interrupted. Your previous baseline is unchanged.")
   if (state.flow !== "complete" && state.flow !== "ready") state.flow = "baseline"
   if (refs.measurementDialog.open) refs.measurementDialog.close("disconnected")
@@ -1243,7 +1243,7 @@ function handleCharacteristic(event) {
   input.lastPacket = JSON.stringify(raw.slice(0, 120))
   input.lastPacketValid = Number.isFinite(parsedValue) && Number.isFinite(parsedValue ** 2 * BASELINE_SAMPLE_COUNT)
   if (!input.lastPacketValid) {
-    window.NeuroFrontAdaptive?.cancel("invalid")
+    window.NeuroFrontAdaptive?.cancel("discardInvalid")
     return
   }
   if (!input.valid || parsedValue !== state.bluetoothValue) {
@@ -1286,7 +1286,7 @@ function handleDisconnectForReconnect() {
 
 async function connectBluetooth() {
   if (refs.connectButton.disabled) return
-  window.NeuroFrontAdaptive?.cancel("lost")
+  window.NeuroFrontAdaptive?.cancel("discardReconnecting")
   if (isDeviceConnected() && (state.calibration.active || state.measurement.active)) handleDisconnectForReconnect()
   if (!navigator.bluetooth) {
     setStatus("disconnected")
@@ -1396,7 +1396,7 @@ window.NeuroFrontDevice = Object.freeze({
     const removedSelection = state.selectedBaselineKey && state.selectedBaselineKey !== "saved" && !explicitBaseline
     if (!state.measurement.active && !state.calibration.active && state.baseline.ready &&
         (removedSelection || state.baseline.createdAt !== (explicitBaseline?.payload || state.savedBaseline)?.createdAt)) {
-      window.NeuroFrontAdaptive?.cancel("changed")
+      window.NeuroFrontAdaptive?.cancel("discardBaseline")
       state.selectedBaselineKey = ""
       state.baseline.ready = false
       if (state.flow !== "complete") state.flow = "baseline"
@@ -1438,8 +1438,8 @@ window.NeuroFrontDevice = Object.freeze({
   },
   resetForAccount() {
     baselineSaveNotice = null
-    const interrupted = state.measurement.active || state.calibration.active || Boolean(window.NeuroFrontAdaptive?.busy())
-    window.NeuroFrontAdaptive?.reset()
+    const interrupted = state.measurement.active || state.calibration.active
+    window.NeuroFrontAdaptive?.reset("discardAccount")
     if (refs.measurementDialog.open) refs.measurementDialog.close("account-changed")
     state.calibration = { active: false, startTime: 0, samples: [], holdTimer: true }
     state.measurement = { active: false, startTime: 0, samples: [], completed: false, revealed: false }
