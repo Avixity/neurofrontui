@@ -23,6 +23,7 @@ async function fixture() {
     if (!elements.has(id)) elements.set(id, {
       id, textContent: "", style: {}, dataset: {}, hidden: false, disabled: false,
       classList: { add() {}, remove() {}, toggle() {} }, addEventListener() {},
+      replaceChildren(...children) { this.children = children },
       getContext: () => ({ createLinearGradient: () => ({ addColorStop() {} }) })
     })
     return elements.get(id)
@@ -39,7 +40,7 @@ async function fixture() {
     }
   }
   const context = vm.createContext({
-    document: { documentElement: { lang: "en" }, getElementById: element, addEventListener() {} },
+    document: { documentElement: { lang: "en" }, getElementById: element, createElement: () => ({ textContent: "", value: "" }), addEventListener() {} },
     window: {
       crypto: { randomUUID },
       NeuroFrontI18n: { setText: (node, text) => { node.textContent = text }, setMessage: (node, key) => { node.textContent = key } },

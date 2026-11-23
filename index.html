@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="capture-history.css">
 </head>
 <body>
 <div class="app-shell">
@@ -117,10 +118,11 @@
         <div class="metric-card stress-card">
           <div class="stress-head">
             <span class="metric-label" data-i18n="stress.meter">Stress Meter</span>
-            <strong class="stress-score" id="stressScore">50</strong>
+            <strong class="stress-score" id="stressScore">50/100</strong>
           </div>
           <div class="stress-bar">
             <span class="stress-fill" id="stressFill"></span>
+            <span class="stress-midpoint" aria-hidden="true"></span>
           </div>
           <div class="stress-scale">
             <span data-i18n="stress.relaxed">Relaxed</span>
@@ -128,7 +130,13 @@
           </div>
           <strong class="stress-label" id="stressLabel" data-i18n="baseline">Baseline</strong>
           <p class="metric-detail" id="stressFeedback" data-i18n="baseline.prepare">Connect and sit relaxed for 20 seconds to calibrate your session baseline.</p>
-          <p class="baseline-note" id="baselineNote" data-i18n="baseline.target">Baseline target: 50/100</p>
+          <p class="baseline-note" id="baselineNote" data-i18n="baseline.noneSelected">No baseline selected</p>
+          <div class="stress-baseline-picker">
+            <label for="baselineSelect" class="metric-label" data-i18n="baseline.chooseTitle">Choose a baseline</label>
+            <select id="baselineSelect" aria-describedby="baselineNote" disabled>
+              <option id="baselinePlaceholder" value="" data-i18n="baseline.noSaved">No saved baseline yet.</option>
+            </select>
+          </div>
           <button class="text-button assistant-explain" id="getMeasurementExplanation" type="button" hidden aria-controls="assistantPanel" data-i18n="assistant.getMore">Get to know more</button>
         </div>
       </section>
@@ -213,8 +221,17 @@
           <p class="control-note" id="historyStatus" role="status" aria-live="polite"></p>
           <button class="action-button ghost compact-button" id="historyRetry" type="button" hidden data-i18n="history.retry">Retry</button>
         </div>
-        <button class="action-button ghost history-load-more" id="historyLoadMore" type="button" hidden data-i18n="history.loadMore">Load More</button>
+        <button class="action-button ghost compact-button history-open" id="historyOpen" type="button" aria-haspopup="dialog" aria-controls="historyDialog" hidden data-i18n="history.open">View history</button>
         <p class="history-storage-note control-note" data-i18n="history.storageNote">Captures stay in this browser on this device.</p>
+        <div class="stress-summary" aria-labelledby="stressSummaryTitle">
+          <h3 id="stressSummaryTitle" data-i18n="history.stressSummary">Stress Summary</h3>
+          <p class="section-caption" id="stressSummaryStatus"></p>
+          <p class="control-note" id="stressSummaryTrend" hidden></p>
+          <details id="stressSummaryDetails" hidden>
+            <summary data-i18n="history.dailyScores">Daily averages</summary>
+            <ul id="stressSummaryDays" class="stress-summary-days"></ul>
+          </details>
+        </div>
       </section>
     </div>
     <section class="panel resources-panel" id="resourcesPanel" aria-labelledby="resourcesTitle">
@@ -261,6 +278,16 @@
     <button class="action-button ghost" id="cancelMeasurementButton" type="button" data-i18n="common.cancel">Cancel</button>
     <button class="action-button accent" id="beginMeasurementButton" type="button" data-i18n="measurement.begin">Begin Measurement</button>
   </div>
+</dialog>
+
+<dialog class="content-dialog" id="historyDialog" aria-labelledby="historyDialogTitle">
+  <div class="setup-dialog-head">
+    <h2 id="historyDialogTitle" data-i18n="history.title">Capture History</h2>
+    <button class="action-button ghost compact-button" id="historyClose" type="button" data-i18n="common.close">Close</button>
+  </div>
+  <div class="history-date-groups" id="historyGroups"></div>
+  <p class="control-note" id="historyDialogNotice" role="status"></p>
+  <button class="action-button ghost history-load-more" id="historyLoadMore" type="button" hidden data-i18n="history.loadMore">Load More</button>
 </dialog>
 
 <dialog class="content-dialog capture-dialog" id="captureDialog" aria-labelledby="captureDialogTitle">

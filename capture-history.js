@@ -4,6 +4,8 @@
   const PAGE_SIZE = 6
   const elements = Object.fromEntries([
     "historyList", "historyEmpty", "historyStatus", "historyRetry", "historyLoadMore",
+    "historyOpen", "historyClose", "historyDialog", "historyGroups", "historyDialogNotice",
+    "stressSummaryStatus", "stressSummaryTrend", "stressSummaryDetails", "stressSummaryDays",
     "captureDialog", "captureClose", "captureDate", "captureScore", "captureCategory",
     "captureActivity", "captureAverage", "capturePeak", "captureMinimum", "captureDuration",
     "captureBaselineDate", "captureBaselineFeatures", "captureGraph", "captureBaselineGraph", "captureExport",
@@ -112,7 +114,7 @@
     guestPending.delete(id)
   }
 
-  async function readPage(after) {
+  async function readPage(after, size) {
     const db = await openDatabase()
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(STORE, "readonly")
@@ -126,7 +128,7 @@
         const item = request.result
         if (!item) return
         if (!validCapture(item.value)) { invalid = true; item.continue(); return }
-        if (page.length === PAGE_SIZE) { more = true; return }
+        if (page.length === size) { more = true; return }
         page.push(item.value)
         nextCursor = item.key
         item.continue()
@@ -142,6 +144,7 @@
       if (reset) visibleCount = Math.max(PAGE_SIZE, visibleCount)
       else visibleCount += PAGE_SIZE
       const account = window.NeuroFrontAccount.getState()
+      if (account.user?.id !== accountOwner) return
       records.clear(); pending.clear(); savedIds.clear()
       const captures = sorted(account.captures.filter(validCapture))
       for (const record of captures.slice(0, visibleCount)) {
@@ -150,24 +153,25 @@
         else pending.set(record.id, record)
       }
       hasMore = captures.length > visibleCount
-      readFailed = Boolean(account.error && !captures.length)
-      renderList()
+      readFailed = account.captures.length !== captures.length || Boolean(account.error && !captures.length)
+      renderList(account)
       return
     }
     const version = scopeVersion
     if (loading) {
       await loading
-      if (!reset) return
+      if (!reset || version !== scopeVersion) return
     }
     loading = (async () => {
       try {
-        const result = await readPage(reset ? null : cursor)
+        const result = await readPage(reset ? null : cursor, reset ? visibleCount : PAGE_SIZE)
         if (version !== scopeVersion) return
         if (reset) records.clear()
         for (const record of result.page) if (!guestDeleted.has(record.id)) { records.set(record.id, record); savedIds.add(record.id) }
+        if (!reset) visibleCount += result.page.length
         cursor = result.nextCursor
         hasMore = result.more
-        readFailed = result.invalid
+        readFailed = result.invalid || (!reset && readFailed)
       } catch { if (version === scopeVersion) readFailed = true }
     })()
     renderList()
@@ -177,73 +181,150 @@
     renderList()
   }
 
-  function renderList() {
+  const formatDay = date => new Intl.DateTimeFormat(document.documentElement.lang, { dateStyle: "medium" }).format(date)
+  const activeHistoryList = () => elements.historyDialog.open ? elements.historyGroups : elements.historyList
+
+  function renderSummary(all, account) {
+    const today = new Date()
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
+    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1)
+    const month = new Intl.DateTimeFormat(document.documentElement.lang, { month: "long", year: "numeric" }).format(today)
+    const candidates = account ? account.captures : all
+    const days = new Map()
+    let total = 0, count = 0
+    for (const record of candidates) {
+      if (account ? !record.cloudSaved || !validCapture(record) : !savedIds.has(record.id)) continue
+      const date = new Date(record.completedAt)
+      if (date < firstDay || date >= nextMonth) continue
+      const day = date.getDate()
+      const group = days.get(day) || { date, sum: 0, count: 0 }
+      group.sum += record.stress.score
+      group.count++
+      total += record.stress.score
+      count++
+      days.set(day, group)
+    }
+    const oldest = all.at(-1)
+    const partial = Boolean(readFailed || (account ? account.error || account.conflict || account.loading : hasMore && (!oldest || new Date(oldest.completedAt) >= firstDay)))
+    const reading = Boolean(loading || account?.loading)
+    const status = !count && reading
+      ? t("history.summaryLoading")
+      : !count && readFailed
+        ? t("history.summaryUnavailable")
+        : t(count === 1 ? "history.summaryMonthOne" : count ? "history.summaryMonth" : "history.summaryEmptyMonth", { month, score: Math.round(total / count), count })
+    elements.stressSummaryStatus.textContent = status + (partial && (count || !readFailed) ? " " + t("history.summaryPartial") : "")
+    const daily = [...days.entries()].sort(([a], [b]) => a - b).map(([, { date, sum, count }]) => ({ date, score: Math.round(sum / count), count }))
+    elements.stressSummaryTrend.hidden = daily.length < 2
+    elements.stressSummaryTrend.textContent = daily.length < 2 ? "" : t("history.summaryCompare", { first: daily[0].score, latest: daily.at(-1).score })
+    elements.stressSummaryDetails.hidden = !count
+    if (!count) elements.stressSummaryDetails.open = false
+    elements.stressSummaryDays.replaceChildren(...daily.map(({ date, score, count }) => {
+      const row = document.createElement("li")
+      const day = document.createElement("span")
+      day.textContent = formatDay(date)
+      const bar = document.createElement("meter")
+      bar.max = 100
+      bar.value = score
+      bar.setAttribute("aria-hidden", "true")
+      const label = document.createElement("span")
+      label.textContent = t(count === 1 ? "history.summaryDayOne" : "history.summaryDay", { score, count })
+      row.append(day, bar, label)
+      return row
+    }))
+  }
+
+  function renderEntry(record) {
+    const entry = document.createElement("li")
+    entry.className = "history-entry"
+    const content = document.createElement("div")
+    content.className = "history-entry-copy"
+    const date = document.createElement("time")
+    date.dateTime = record.completedAt
+    date.textContent = formatDate(record.completedAt)
+    const meta = document.createElement("p")
+    meta.className = "history-entry-meta"
+    const score = document.createElement("strong")
+    score.textContent = `${Math.round(record.stress.score)}/100`
+    const category = document.createElement("span")
+    category.textContent = translatedLabel(record.stress.label)
+    meta.append(score, category)
+    content.append(date, meta)
+    if (pending.has(record.id)) {
+      const status = document.createElement("small")
+      status.textContent = t(accountOwner ? "account.sync.pending" : saving.has(record.id) ? "history.saving" : "history.notSaved")
+      content.append(status)
+    }
+    const button = document.createElement("button")
+    button.type = "button"
+    button.className = "history-info-button"
+    button.textContent = "i"
+    button.dataset.captureId = record.id
+    button.setAttribute("aria-label", `${t("history.view")}: ${formatDate(record.completedAt)}`)
+    button.setAttribute("aria-haspopup", "dialog")
+    button.setAttribute("aria-controls", "captureDialog")
+    button.addEventListener("click", () => openCapture(record, button))
+    const remove = document.createElement("button")
+    remove.type = "button"
+    remove.className = "history-info-button history-delete-button"
+    remove.dataset.deleteCaptureId = record.id
+    remove.title = t("history.delete")
+    remove.setAttribute("aria-label", `${t("history.delete")}: ${formatDate(record.completedAt)}`)
+    remove.setAttribute("aria-haspopup", "dialog")
+    remove.setAttribute("aria-controls", "captureDeleteDialog")
+    const icon = svgNode("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": 1.6, "aria-hidden": true })
+    icon.append(svgNode("path", { d: "M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7M14 10v7" }))
+    remove.append(icon)
+    remove.addEventListener("click", () => requestDelete(record, remove))
+    const actions = document.createElement("div")
+    actions.className = "history-entry-actions"
+    actions.append(button, remove)
+    entry.append(content, actions)
+    return entry
+  }
+  function renderList(account = accountOwner ? window.NeuroFrontAccount?.getState() : null) {
+    if (account?.user?.id !== accountOwner) account = null
     const focusedId = document.activeElement?.dataset.captureId
     const focusedDeleteId = document.activeElement?.dataset.deleteCaptureId
-    const all = new Map(records)
-    for (const [id, record] of pending) all.set(id, record)
-    elements.historyList.replaceChildren()
-    for (const record of sorted([...all.values()])) {
-      const entry = document.createElement("li")
-      entry.className = "history-entry"
-      const content = document.createElement("div")
-      content.className = "history-entry-copy"
-      const date = document.createElement("time")
-      date.dateTime = record.completedAt
-      date.textContent = formatDate(record.completedAt)
-      const meta = document.createElement("p")
-      meta.className = "history-entry-meta"
-      const score = document.createElement("strong")
-      score.textContent = `${Math.round(record.stress.score)}/100`
-      const category = document.createElement("span")
-      category.textContent = translatedLabel(record.stress.label)
-      meta.append(score, category)
-      content.append(date, meta)
-      if (pending.has(record.id)) {
-        const status = document.createElement("small")
-        status.textContent = t(accountOwner ? "account.sync.pending" : saving.has(record.id) ? "history.saving" : "history.notSaved")
-        content.append(status)
+    const merged = new Map(records)
+    for (const [id, record] of pending) merged.set(id, record)
+    const all = sorted([...merged.values()])
+    elements.historyList.replaceChildren(...all.slice(0, 2).map(renderEntry))
+    elements.historyGroups.replaceChildren()
+    if (elements.historyDialog.open) {
+      const groups = new Map()
+      for (const record of all) {
+        const date = new Date(record.completedAt)
+        const key = date.toDateString()
+        if (!groups.has(key)) {
+          const group = document.createElement("section")
+          group.className = "history-date-group"
+          const heading = document.createElement("h3")
+          heading.textContent = formatDay(date)
+          const list = document.createElement("ol")
+          list.className = "history-list"
+          group.append(heading, list)
+          elements.historyGroups.append(group)
+          groups.set(key, list)
+        }
+        groups.get(key).append(renderEntry(record))
       }
-      const button = document.createElement("button")
-      button.type = "button"
-      button.className = "history-info-button"
-      button.textContent = "i"
-      button.dataset.captureId = record.id
-      button.setAttribute("aria-label", `${t("history.view")}: ${formatDate(record.completedAt)}`)
-      button.setAttribute("aria-haspopup", "dialog")
-      button.setAttribute("aria-controls", "captureDialog")
-      button.addEventListener("click", () => openCapture(record, button))
-      const remove = document.createElement("button")
-      remove.type = "button"
-      remove.className = "history-info-button history-delete-button"
-      remove.dataset.deleteCaptureId = record.id
-      remove.title = t("history.delete")
-      remove.setAttribute("aria-label", `${t("history.delete")}: ${formatDate(record.completedAt)}`)
-      remove.setAttribute("aria-haspopup", "dialog")
-      remove.setAttribute("aria-controls", "captureDeleteDialog")
-      const icon = svgNode("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": 1.6, "aria-hidden": true })
-      icon.append(svgNode("path", { d: "M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7M14 10v7" }))
-      remove.append(icon)
-      remove.addEventListener("click", () => requestDelete(record, remove))
-      const actions = document.createElement("div")
-      actions.className = "history-entry-actions"
-      actions.append(button, remove)
-      entry.append(content, actions)
-      elements.historyList.append(entry)
     }
-    elements.historyEmpty.hidden = all.size > 0 || readFailed || Boolean(loading)
+    elements.historyOpen.hidden = !all.length
+    elements.historyGroups.setAttribute("aria-busy", String(Boolean(loading)))
+    elements.historyEmpty.hidden = all.length > 0 || readFailed || Boolean(loading)
     elements.historyList.setAttribute("aria-busy", String(Boolean(loading)))
     elements.historyLoadMore.hidden = !hasMore
     elements.historyLoadMore.disabled = Boolean(loading)
     const failedSaves = pending.size > saving.size
     elements.historyRetry.hidden = !failedSaves && !readFailed
     elements.historyRetry.disabled = Boolean(saving.size || loading)
-    const account = accountOwner ? window.NeuroFrontAccount?.getState() : null
     const status = account ? account.conflict ? "account.error.conflict" : account.pendingCaptureDeletes?.length ? "history.deletePending" : account.error ? "account.sync.error" : account.pending ? "account.sync.pending" : historyNotice : failedSaves ? "history.saveFailed" : readFailed ? "history.loadFailed" : saving.size ? "history.saving" : loading ? "history.loading" : historyNotice
     elements.historyStatus.textContent = status ? t(status) : ""
+    elements.historyDialogNotice.textContent = status ? t(status) : all.length ? "" : t("history.empty")
+    renderSummary(all, account)
     if (account?.pendingCaptureDeletes?.length) elements.historyRetry.hidden = false
     if ((focusedId || focusedDeleteId) && !elements.captureDialog.open && !elements.captureDeleteDialog.open) {
-      [...elements.historyList.querySelectorAll("button")].find(button => focusedDeleteId ? button.dataset.deleteCaptureId === focusedDeleteId : button.dataset.captureId === focusedId)?.focus({ preventScroll: true })
+      [...activeHistoryList().querySelectorAll("button")].find(button => focusedDeleteId ? button.dataset.deleteCaptureId === focusedDeleteId : button.dataset.captureId === focusedId)?.focus({ preventScroll: true })
     }
   }
 
@@ -356,7 +437,7 @@
 
   function openCapture(record, button) {
     selected = copy(record)
-    returnFocus = { element: button, id: record.id }
+    returnFocus = { element: button, id: record.id, version: scopeVersion }
     renderCapture()
     elements.captureDialog.showModal()
     elements.captureDialog.scrollTop = 0
@@ -397,7 +478,7 @@
       elements.captureDeleteDialog.close()
       await loadPage(true)
       if (target.version === scopeVersion && !elements.captureDialog.open && !elements.captureDeleteDialog.open) {
-        const next = elements.historyList.querySelector(".history-delete-button") || document.getElementById("historyTitle")
+        const next = activeHistoryList().querySelector(".history-delete-button") || (elements.historyDialog.open ? elements.historyClose : document.getElementById("historyTitle"))
         next.focus({ preventScroll: true })
       }
     } catch {
@@ -435,7 +516,28 @@
     link.click()
   }
 
-  elements.historyLoadMore.addEventListener("click", () => loadPage())
+  elements.historyOpen.addEventListener("click", () => {
+    elements.historyDialog.showModal()
+    elements.historyDialog.scrollTop = 0
+    renderList()
+    elements.historyClose.focus({ preventScroll: true })
+  })
+  elements.historyClose.addEventListener("click", () => elements.historyDialog.close())
+  elements.historyDialog.addEventListener("close", () => {
+    if (elements.historyDialog.open) return
+    elements.historyGroups.replaceChildren()
+    const target = elements.historyOpen.hidden ? document.getElementById("historyTitle") : elements.historyOpen
+    target?.focus({ preventScroll: true })
+  })
+  elements.historyLoadMore.addEventListener("click", async () => {
+    const shown = elements.historyGroups.querySelectorAll(".history-info-button:not(.history-delete-button)").length
+    const version = scopeVersion
+    await loadPage()
+    if (version !== scopeVersion || !elements.historyDialog.open) return
+    const buttons = elements.historyGroups.querySelectorAll(".history-info-button:not(.history-delete-button)")
+    const target = buttons[shown] || (elements.historyLoadMore.hidden ? elements.historyClose : elements.historyLoadMore)
+    target.focus({ preventScroll: target === elements.historyClose })
+  })
   elements.historyRetry.addEventListener("click", async () => {
     if (accountOwner) { await window.NeuroFrontAccount.retry().catch(() => {}); await loadPage(true); return }
     await Promise.all([...pending.values()].map(persist))
@@ -455,8 +557,8 @@
   })
   elements.captureDeleteDialog.addEventListener("close", () => {
     const target = deleteTarget
-    const replacement = [...elements.historyList.querySelectorAll(".history-delete-button")].find(button => button.dataset.deleteCaptureId === target?.record.id)
-    const focus = target?.button.isConnected ? target.button : replacement || document.getElementById("historyTitle")
+    const replacement = [...activeHistoryList().querySelectorAll(".history-delete-button")].find(button => button.dataset.deleteCaptureId === target?.record.id)
+    const focus = target?.button.isConnected ? target.button : replacement || (elements.historyDialog.open ? elements.historyClose : document.getElementById("historyTitle"))
     if (target?.version === scopeVersion) focus?.focus({ preventScroll: true })
     if (!deleteBusy) deleteTarget = null
   })
@@ -474,9 +576,9 @@
     if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) elements.captureDialog.close()
   })
   elements.captureDialog.addEventListener("close", () => {
-    const replacement = [...elements.historyList.querySelectorAll("button")].find(button => button.dataset.captureId === returnFocus?.id)
-    const target = returnFocus?.element.isConnected ? returnFocus.element : replacement || document.getElementById("historyLoadMore")
-    target?.focus({ preventScroll: true })
+    const replacement = [...activeHistoryList().querySelectorAll("button")].find(button => button.dataset.captureId === returnFocus?.id)
+    const target = returnFocus?.element.isConnected ? returnFocus.element : replacement || (elements.historyDialog.open ? elements.historyClose : elements.historyOpen)
+    if (returnFocus?.version === scopeVersion) target?.focus({ preventScroll: true })
     selected = null
   })
   document.addEventListener("neurofront:languagechange", () => { renderList(); renderCapture(); renderDelete() })
@@ -530,6 +632,7 @@
     elements.captureDeleteDialog.close()
     deleteTarget = null; deleteBusy = false; deleteFailed = false; historyNotice = ""
     if (elements.captureDialog.open) elements.captureDialog.close()
+    if (elements.historyDialog.open) elements.historyDialog.close()
     records.clear(); pending.clear(); saving.clear(); savedIds.clear()
     latestCapture = null; selected = null; cursor = null; hasMore = false; readFailed = false; loading = null; visibleCount = PAGE_SIZE
     if (!accountOwner) for (const [id, record] of guestPending) pending.set(id, record)

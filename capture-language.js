@@ -2,6 +2,18 @@
   const additions = {
     en: {
       "history.title": "Capture History",
+      "history.open": "View history",
+      "history.stressSummary": "Stress Summary",
+      "history.dailyScores": "Daily averages",
+      "history.summaryLoading": "Loading saved captures…",
+      "history.summaryUnavailable": "This month’s saved captures could not be read.",
+      "history.summaryPartial": "Based on loaded captures. Some saved captures may not be included.",
+      "history.summaryEmptyMonth": "{month}: No saved captures to summarize.",
+      "history.summaryMonth": "{month}: {score}/100 average across {count} saved captures.",
+      "history.summaryMonthOne": "{month}: {score}/100 average from 1 saved capture.",
+      "history.summaryCompare": "First recorded day: {first}/100 · Latest recorded day: {latest}/100",
+      "history.summaryDay": "{score}/100 · {count} captures",
+      "history.summaryDayOne": "{score}/100 · 1 capture",
       "history.local": "Saved on this device",
       "history.empty": "Your completed captures will appear here.",
       "history.summaryEmpty": "Complete a measurement to see your capture results.",

@@ -1,0 +1,13 @@
+.history-open { margin-top: 8px; }
+.history-date-groups { display: grid; gap: 18px; }
+.history-date-group h3 { margin: 0 0 8px; font-size: 0.95rem; }
+.stress-summary { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.stress-summary h3 { margin: 0; font-size: 1rem; }
+.stress-summary .control-note { margin-top: 6px; }
+.stress-summary details { margin-top: 8px; }
+.stress-summary summary { cursor: pointer; width: fit-content; }
+.stress-summary summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.stress-summary-days { display: grid; gap: 8px; list-style: none; padding: 0; margin: 10px 0 0; }
+.stress-summary-days li { display: grid; grid-template-columns: minmax(0, 1fr) 4ch minmax(7ch, auto); gap: 6px 10px; align-items: center; font-size: 0.8rem; }
+.stress-summary-days meter { width: 100%; accent-color: var(--accent); }
+@media (max-width: 560px) { .stress-summary-days li { grid-template-columns: minmax(0, 1fr) auto; } .stress-summary-days meter { grid-column: 1/-1; grid-row: 2; } }

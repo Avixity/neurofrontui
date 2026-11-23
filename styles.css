@@ -454,6 +454,29 @@ h2 {
 .stress-card > .baseline-note { grid-column: 2; grid-row: 4; text-align: right; align-self: center; }
 .stress-card .metric-detail { line-height: 1.5; }
 
+.stress-baseline-picker {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.stress-baseline-picker select {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  color: inherit;
+  background: #121b28;
+  color-scheme: dark;
+  font: inherit;
+}
+
+.stress-baseline-picker select:disabled { color: var(--muted); }
+.stress-baseline-picker select:focus-visible { outline: 2px solid #53d7bc; outline-offset: 2px; }
+
 .stress-head {
   display: flex;
   align-items: center;
@@ -483,6 +506,18 @@ h2 {
   border-radius: inherit;
   background: linear-gradient(90deg, #53d7bc 0%, #f7c75d 60%, #ff5c76 100%);
   transition: width 220ms ease;
+}
+
+.stress-midpoint {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  left: calc(50% - 1px);
+  width: 2px;
+  border-radius: 2px;
+  background: #f0f6fc;
+  box-shadow: 0 0 0 1px #293543;
+  pointer-events: none;
 }
 
 .stress-scale {

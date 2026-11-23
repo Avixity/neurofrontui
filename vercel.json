@@ -17,6 +17,7 @@
     { "src": "language-data.js", "use": "@vercel/static" },
     { "src": "capture-language.js", "use": "@vercel/static" },
     { "src": "capture-history.js", "use": "@vercel/static" },
+    { "src": "capture-history.css", "use": "@vercel/static" },
     { "src": "resource-data.js", "use": "@vercel/static" },
     { "src": "resources.js", "use": "@vercel/static" },
     { "src": "setup-viewer.js", "use": "@vercel/static" },

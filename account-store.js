@@ -128,7 +128,7 @@
       window.NeuroFrontI18n?.select(preferences.language || "en", false)
       window.NeuroFrontResources?.setExpanded(preferences.resourcesExpanded === true, false)
       const active = bucket?.baselines.find(row => row.id === bucket.profile?.active_baseline_id)
-      window.NeuroFrontDevice?.setSavedBaseline(active?.payload || null)
+      window.NeuroFrontDevice?.setSavedBaseline(active?.payload || null, bucket?.baselines || [])
     } finally { applying = false }
   }
   async function loadAvatar(id, generation) {

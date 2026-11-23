@@ -3,7 +3,7 @@ const repo=__dirname
 const source=fs.readFileSync(repo+'/app.js','utf8').replace(/\binit\(\)\s*$/,'')
 function fixture(storage=new Map()) {
   const elements=new Map(), calls={requests:0,connections:0,notifications:0,disconnects:0},clock={now:1000}
-  const doc={documentElement:{lang:'en'},getElementById(id){if(!elements.has(id))elements.set(id,{id,textContent:'',style:{},dataset:{},className:'',hidden:false,classList:{add(){},remove(){},toggle(){}},addEventListener(){}});return elements.get(id)},addEventListener(){}}
+  const doc={createElement:()=>({textContent:"",value:""}),documentElement:{lang:'en'},getElementById(id){if(!elements.has(id))elements.set(id,{id,textContent:'',style:{},dataset:{},className:'',hidden:false,classList:{add(){},remove(){},toggle(){}},addEventListener(type,callback){this[type]=callback},replaceChildren(...children){this.children=children}});return elements.get(id)},addEventListener(){}}
   const char=new EventTarget();char.startNotifications=async()=>{calls.notifications++;if(calls.notifications===1)throw Error('Simulated retry');return char}
   const device=new EventTarget();device.gatt={connected:false,async connect(){calls.connections++;this.connected=true;return this},disconnect(){calls.disconnects++;this.connected=false;device.dispatchEvent(new Event('gattserverdisconnected'))},async getPrimaryService(uuid){calls.service=uuid;return {async getCharacteristic(uuid){calls.characteristic=uuid;return char}}}}
   const context=vm.createContext({document:doc,window:{NeuroFrontI18n:{setText:(el,s)=>el.textContent=s,setMessage:(el,k,v)=>el.textContent=k+JSON.stringify(v)}},navigator:{bluetooth:{async requestDevice(opts){calls.requests++;calls.options=opts;return device}}},performance:{now:()=>clock.now},localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)},TextDecoder,Date,Intl,setTimeout,console})
@@ -29,6 +29,10 @@ function expectActions(f,stage) {
   const f=fixture(),read=expr=>JSON.parse(f.evaluate(`JSON.stringify(${expr})`))
   f.evaluate('loadSavedBaseline(); updateControlsAvailability(0)')
   expectActions(f,'baseline')
+  f.evaluate('refreshStressState([])')
+  assert.equal(f.elements.get('baselineNote').textContent,'No baseline selected')
+  assert.equal(f.elements.get('stressScore').textContent,'50/100')
+  assert.equal(f.elements.get('baselineSelect').disabled,true)
   assert.equal(f.elements.get('recalibrateButton').disabled,true)
   assert.equal(f.elements.get('savedBaselineButton').disabled,true)
   assert.equal(f.elements.get('exportButton').disabled,true)
@@ -87,7 +91,21 @@ function expectActions(f,stage) {
   const reload=fixture(new Map(f.storage));reload.evaluate('loadSavedBaseline()')
   assert.equal(reload.evaluate('state.savedBaseline.samples.length'),400)
   assert.equal(reload.evaluate('state.baseline.ready'),false,'Refresh must offer explicit saved baseline choice')
-  await reload.evaluate('connectBluetooth()');reload.evaluate('useSavedBaseline()')
+  reload.evaluate('bindEvents()')
+  const select=reload.elements.get('baselineSelect')
+  assert.equal(select.disabled,false)
+  assert.equal(select.children.length,2)
+  assert.equal(select.value,'')
+  select.value='saved';select.change()
+  assert.equal(reload.elements.get('baselineNote').textContent,'Baseline set at 50/100')
+  assert.equal(reload.elements.get('measureButton').disabled,true)
+  reload.evaluate('startCalibration(); startMeasurement()')
+  assert.equal(reload.evaluate('state.calibration.active || state.measurement.active'),false,
+    'Local saved baseline selection must not bypass BLE for calibration or capture')
+  await reload.evaluate('connectBluetooth()')
+  assert.equal(select.value,'saved','Connecting keeps the queued baseline')
+  assert.equal(reload.evaluate('canStartMeasurement()'),true)
+
   assert.equal(reload.evaluate('state.baseline.ready'),true)
   assert.equal(reload.evaluate('state.baseline.mean'),second.mean)
   assert.equal(reload.elements.get('countdownValue').textContent,'15.0')
@@ -138,6 +156,20 @@ function expectActions(f,stage) {
   assert.equal(reload.evaluate('state.measurement.completed'),false,'An empty capture is not a completed result')
   assert.equal(reload.elements.get('exportButton').disabled,true)
   assert.equal(reload.elements.get('measurementState').textContent,'No live signal detected')
+  const account=fixture(new Map(f.storage))
+  account.context.records=[{id:'account-first',payload:saved},{id:'account-second',payload:JSON.parse(persisted)},{id:'broken',payload:{}}]
+  account.evaluate('bindEvents(); loadSavedBaseline(); window.NeuroFrontDevice.resetForAccount(); window.NeuroFrontDevice.setSavedBaseline(records[1].payload,records)')
+  const accountSelect=account.elements.get('baselineSelect')
+  assert.deepEqual(accountSelect.children.map(option=>option.value).slice(1).sort(), ['account-first','account-second'])
+  accountSelect.value='account-first';accountSelect.change()
+  account.evaluate('window.NeuroFrontDevice.setSavedBaseline(records[1].payload,records)')
+  assert.equal(accountSelect.value,'account-first','A session-selected account version survives owner refresh')
+  assert.equal(account.evaluate('state.baseline.createdAt'),saved.createdAt)
+  account.evaluate('window.NeuroFrontDevice.resetForAccount()')
+  assert.equal(accountSelect.disabled,true)
+  assert.equal(accountSelect.children.length,1)
+  assert.equal(account.elements.get('baselineNote').textContent,'No baseline selected')
+  assert.ok(account.storage.get('neurofront.baseline.v1'),'Account load and reset do not modify guest storage')
   f.context.localStorage.setItem=()=>{throw Error('Simulated quota error')}
   f.evaluate('startCalibration()');f.capture(2)
   assert.equal(f.evaluate('state.baseline.ready'),true)
