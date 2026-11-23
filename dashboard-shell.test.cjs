@@ -170,4 +170,3 @@ const url = process.env.NEUROFRONT_URL || "http://127.0.0.1:5180"
     console.log("Synthetic dashboard shell passed at desktop, phone, and narrow-phone widths.")
   } finally { await browser.close() }
 })().catch(error => { console.error(error); process.exitCode = 1 })
-
