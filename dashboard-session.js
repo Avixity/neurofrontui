@@ -1,8 +1,8 @@
 (() => {
   "use strict"
   const ui = Object.fromEntries(["modeSelect", "adaptivePanel", "adaptiveStart", "adaptiveStop",
-    "adaptiveTime", "adaptiveStatus", "adaptiveCoverage", "adaptiveSaveStatus"].map(id => [id, document.getElementById(id)]))
-  const durations = new Map([["adaptive", 0], ["adaptive-5", 300000], ["adaptive-10", 600000]])
+    "adaptiveTime", "adaptiveStatus", "adaptiveCoverage", "adaptiveSaveStatus", "adaptiveDuration", "adaptiveCustomMinutes", "adaptiveCustomSetting", "adaptiveCustomError"].map(id => [id, document.getElementById(id)]))
+  const durations = new Map([["unlimited", 0], ["5", 300000], ["10", 600000]])
   const windowMs = MEASUREMENT_MS
   const slotMs = SAMPLE_INTERVAL
   const slots = windowMs / slotMs
@@ -11,7 +11,15 @@
   let elapsed = 0
   const owner = () => window.NeuroFrontAccount?.owner?.() || null
   const busy = () => run !== null
-  const selected = () => durations.has(choice)
+  const selected = () => choice === "adaptive"
+  const setFlag = (el, name, value) => { if (el[name] !== value) el[name] = value }
+  function durationLimit() {
+    const preset = ui.adaptiveDuration.value
+    if (preset !== "custom") return durations.get(preset) ?? null
+    const raw = ui.adaptiveCustomMinutes.value
+    const minutes = Number(raw)
+    return /^\d{1,2}$/.test(raw) && minutes >= 1 && minutes <= 60 ? minutes * 60000 : null
+  }
   const ready = now => !document.hidden && isDeviceConnected() && !!state.characteristic && state.baseline.ready &&
     ["ready", "complete"].includes(state.flow) && !state.measurement.active && !state.calibration.active &&
     hasFreshBluetoothSignal(now) && now - state.lastIncomingTime < maxGapMs
@@ -22,12 +30,22 @@
     if (ui.adaptiveTime.textContent !== display) ui.adaptiveTime.textContent = display
   }
   function render(now = performance.now()) {
-    ui.modeSelect.disabled = locked()
+    setFlag(ui.modeSelect, "disabled", locked())
     if (!selected()) return
+    const isCustom = ui.adaptiveDuration.value === "custom"
+    const invalid = isCustom && durationLimit() === null
     const canBegin = ready(now)
-    ui.adaptiveStart.disabled = !canBegin || busy()
-    ui.adaptiveStart.hidden = busy()
-    ui.adaptiveStop.hidden = !busy()
+    const settingLocked = busy() || state.calibration.active
+    setFlag(ui.adaptiveDuration, "disabled", settingLocked)
+    setFlag(ui.adaptiveCustomSetting, "hidden", !isCustom)
+    setFlag(ui.adaptiveCustomMinutes, "disabled", settingLocked || !isCustom)
+    setFlag(ui.adaptiveCustomError, "hidden", !invalid)
+    if (ui.adaptiveCustomMinutes.getAttribute("aria-invalid") !== String(invalid)) {
+      ui.adaptiveCustomMinutes.setAttribute("aria-invalid", String(invalid))
+    }
+    setFlag(ui.adaptiveStart, "disabled", !canBegin || durationLimit() === null || busy())
+    setFlag(ui.adaptiveStart, "hidden", busy())
+    setFlag(ui.adaptiveStop, "hidden", !busy())
     document.body.classList.toggle("adaptive-calibrating", state.calibration.active)
     timer(run ? Math.min(now - run.start, run.limit || Infinity) : elapsed)
     const label = run ? "running" : message || (canBegin ? "ready" : "missing")
@@ -35,8 +53,8 @@
       lastLabel = label
       window.NeuroFrontI18n.setMessage(ui.adaptiveStatus, "dash." + label, result || {})
     }
-    ui.adaptiveCoverage.hidden = !result
-    ui.adaptiveSaveStatus.hidden = !result || result.saved
+    setFlag(ui.adaptiveCoverage, "hidden", !result)
+    setFlag(ui.adaptiveSaveStatus, "hidden", !result || result.saved)
   }
   function endRun(now) {
     run = null
@@ -64,6 +82,8 @@
     run = null
     clearResult()
     ui.modeSelect.value = choice = "standard"
+    ui.adaptiveDuration.value = "unlimited"
+    ui.adaptiveCustomMinutes.value = "15"
     ui.adaptivePanel.hidden = true
     window.NeuroFrontI18n.setText(ui.adaptiveCoverage, "")
     window.NeuroFrontI18n.setText(ui.adaptiveStatus, "")
@@ -72,15 +92,15 @@
     render()
   }
   function begin() {
-    const now = performance.now(), limit = durations.get(choice)
-    if (run || !selected() || !ready(now)) return
+    const now = performance.now(), limit = durationLimit()
+    if (run || !selected() || limit === null || !ready(now)) return
     const baseline = Object.fromEntries(["mean", "rms", "stdDev", "peakToPeak", "derivativeMean"].map(k => [k, state.baseline[k]]))
     if (!Object.values(baseline).every(Number.isFinite) || !(baseline.peakToPeak > 0)) {
       clearResult(); message = "invalid"; render(now); return
     }
     clearResult()
     const wall = Date.now()
-    run = { start: now, limit, owner: owner(), baseline, reference: state.baseline.createdAt,
+    run = { start: now, limit, preset: ui.adaptiveDuration.value, owner: owner(), baseline, reference: state.baseline.createdAt,
       characteristic: state.characteristic, lastPacket: now, lastPacketWall: wall, index: 0, values: new Array(slots), mean: 0, first: null, last: null }
     window.NeuroFrontAccount?.deviceBusy()
     updateControlsAvailability(now)
@@ -115,7 +135,7 @@
     const score = Math.round(run.mean)
     const saved = window.NeuroFrontAdaptiveHistory?.save({
       type: "adaptive", completedAt: Date.now(), durationMs: duration, presetMs: run.limit,
-      end: requestedStop ? "manual" : "timer", count, score
+      end: requestedStop ? "manual" : "timer", count, score, ...(run.preset === "custom" ? { custom: true } : {})
     }, run.owner) === true
     const focused = document.activeElement === ui.adaptiveStop
     elapsed = duration
@@ -159,7 +179,7 @@
   }
   ui.modeSelect.addEventListener("change", () => {
     const next = ui.modeSelect.value
-    if ((next !== "standard" && !durations.has(next)) || locked()) {
+    if (!["standard", "adaptive"].includes(next) || locked()) {
       ui.modeSelect.value = choice; return
     }
     if (next === choice) return
@@ -170,6 +190,15 @@
     updateControlsAvailability(performance.now())
     render()
   })
+  function updateDuration() {
+    if (run) {
+      ui.adaptiveDuration.value = run.preset
+      if (run.preset === "custom") ui.adaptiveCustomMinutes.value = String(run.limit / 60000)
+    }
+    render()
+  }
+  ui.adaptiveDuration.addEventListener("change", updateDuration)
+  ui.adaptiveCustomMinutes.addEventListener("input", updateDuration)
   ui.adaptiveStart.addEventListener("click", begin)
   ui.adaptiveStop.addEventListener("click", stop)
   document.addEventListener("visibilitychange", () => { if (document.hidden) cancel("visibility") })

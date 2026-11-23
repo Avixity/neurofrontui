@@ -17,7 +17,7 @@ function fixture(storage = new Map(), id = null, resolved = true) {
     documentElement:{lang:"en"}, createElement: node, addEventListener(name, fn) { events.set(name, fn) },
     getElementById(id) { if (!elements.has(id)) elements.set(id,node()); return elements.get(id) }
   }
-  const window = { addEventListener(){}, NEUROFRONT_TRANSLATIONS:{en:{"dash.adaptiveEntryElapsed":"{duration} elapsed"}},
+  const window = { addEventListener(){}, NEUROFRONT_TRANSLATIONS:{en:{"dash.adaptiveEntryElapsed":"{duration} elapsed","dash.customPreset":"Custom · {minutes} min","dash.unlimited":"Unlimited"}},
     NeuroFrontAccount:{owner:()=>id,sessionResolved:()=>resolved} }
   let failWrite = false
   vm.runInNewContext(source, {document,window,localStorage:{
@@ -68,4 +68,18 @@ test("session restoration, guest and different owners cannot see or save each ot
   f.fail()
   assert.equal(f.archive.save({...example,score:60},null),false)
   assert.deepEqual(JSON.parse(storage.get(prefix+"guest")),[example])
+})
+test("custom rows are additive without relabeling or deleting previous archive entries", () => {
+  const storage = new Map([[prefix+"guest",JSON.stringify([example])]])
+  const {archive,list}=fixture(storage)
+  for (const presetMs of [0, 59999, 60001, "60000", 3660000]) {
+    assert.equal(archive.save({...example,presetMs,custom:true},null),false)
+  }
+  const custom={...example,presetMs:300000,custom:true}
+  assert.equal(archive.save(custom,null),true)
+  assert.deepEqual(JSON.parse(storage.get(prefix+"guest")),[custom,example])
+  assert.match(list.children[0].children[1].children[1].textContent,/Custom.*5 min/)
+  assert.match(list.children[1].children[1].children[1].textContent,/Unlimited/)
+  const reloaded=fixture(storage)
+  assert.equal(reloaded.list.children.length,2)
 })

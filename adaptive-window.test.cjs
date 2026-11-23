@@ -11,6 +11,7 @@ function fixture() {
   const document = { hidden: false, body: { classList: { toggle() {}, remove() {} } },
     addEventListener(key, cb) { events.set(key,cb) }, getElementById(id) {
       if (!controls.has(id)) controls.set(id, { value: "", hidden: false, disabled: false, focus() {},
+        getAttribute(key) { return this[key] }, setAttribute(key, value) { this[key] = value },
         addEventListener(event, fn) { this[event] = fn } })
       return controls.get(id)
     } }
@@ -29,8 +30,11 @@ function fixture() {
     } })
   vm.runInContext(source, ctx)
   const el = id => controls.get(id), api = window.NeuroFrontAdaptive
-  function start(minutes = 5) {
-    el("modeSelect").value = minutes ? "adaptive-" + minutes : "adaptive"; el("modeSelect").change()
+  function start(minutes = 5, custom) {
+    el("modeSelect").value = "adaptive"; el("modeSelect").change()
+    el("adaptiveDuration").value = custom !== undefined ? "custom" : minutes ? String(minutes) : "unlimited"
+    if (custom !== undefined) el("adaptiveCustomMinutes").value = custom
+    el("adaptiveDuration").change()
     el("adaptiveStart").click()
     return now
   }
@@ -117,4 +121,31 @@ test("manual early stop is never labeled a finished timed cycle; stale stop neve
       assert.equal(f.archive[0].record.durationMs,15010)
     }
   }
+})
+test("custom duration strictly validates whole minutes from 1 to 60 and snapshots the chosen timer", () => {
+  for (const raw of ["","0","61","1.1","1e1","1.0","-1","Infinity","NaN"]) {
+    const f=fixture()
+    f.start(0,raw)
+    assert.equal(f.api.busy(),false,raw)
+    assert.equal(f.el("adaptiveStart").disabled,true,raw)
+    assert.equal(f.el("adaptiveCustomError").hidden,false,raw)
+  }
+  const bounded=fixture()
+  bounded.start(0,"60")
+  assert.equal(bounded.api.busy(),true)
+  assert.equal(bounded.el("adaptiveCustomMinutes").disabled,true)
+  assert.equal(bounded.el("adaptiveDuration").disabled,true)
+  const f=fixture(),start=f.start(0,"1")
+  f.el("adaptiveCustomMinutes").value="60"
+  f.el("adaptiveCustomMinutes").input()
+  assert.equal(f.el("adaptiveCustomMinutes").value,"1")
+  f.el("adaptiveDuration").value="unlimited"
+  f.el("adaptiveDuration").change()
+  assert.equal(f.el("adaptiveDuration").value,"custom")
+  for(let n=0;n<1200;n++) f.at(start+50*n,Math.sin(n))
+  f.at(start+60000)
+  assert.equal(f.api.busy(),false)
+  assert.deepEqual(JSON.parse(JSON.stringify(f.archive[0].record)),{
+    type:"adaptive", completedAt:1234567890000, durationMs:60000, presetMs:60000, end:"timer", count:4, score:50, custom:true
+  })
 })

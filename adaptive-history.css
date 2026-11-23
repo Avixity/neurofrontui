@@ -13,3 +13,12 @@
 .adaptive-archive-entry p { display:flex; flex-wrap:wrap; gap:4px 10px; align-items:baseline; margin:5px 0; }
 .adaptive-archive-entry span,.adaptive-archive-entry time,.adaptive-archive-entry small { color:#c8d7de; font-size:.83rem; }
 .history-section-type { display:block; font-weight:650; margin:0 0 4px; }
+
+.adaptive-settings { align-self:center; display:flex; flex-wrap:wrap; justify-content:center; align-items:end; gap:8px 12px; max-width:100%; }
+.adaptive-settings label { display:grid; min-width:0; gap:5px; color:#c4d4df; font-size:.84rem; }
+.adaptive-settings :is(select,input) { min-height:44px; min-width:0; max-width:100%; padding:7px 10px; border:1px solid var(--border-strong); border-radius:10px; font:inherit; color:var(--text); background:#172431; }
+.adaptive-settings input { width:9ch; }
+.adaptive-settings :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.adaptive-settings :disabled { opacity:.7; }
+.adaptive-settings [aria-invalid=true] { border-color:var(--danger); }
+#adaptiveCustomError { flex-basis:100%; margin:0; text-align:center; color:#ffb1bd; }

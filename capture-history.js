@@ -7,7 +7,7 @@
     "historyOpen", "historyClose", "historyDialog", "historyGroups", "historyDialogNotice",
     "stressSummaryDialog", "stressSummaryOpen", "stressSummaryClose", "stressSummaryPrevious", "stressSummaryNext",
     "stressSummaryStatus", "stressSummaryMonth", "stressSummaryWeekdays", "stressSummaryDays", "stressSummaryDay",
-    "stressSummaryDayDetails", "stressSummaryTimes", "stressSummaryToday", "stressSummaryTodayNarrative", "stressSummaryDetails",
+    "stressSummaryDayCard", "stressSummaryDayNarrative", "stressSummaryDayNext", "stressSummaryDayMetrics", "stressSummaryDayDetails", "stressSummaryTimes", "stressSummaryToday", "stressSummaryTodayNarrative", "stressSummaryDetails",
     "captureDialog", "captureClose", "captureDate", "captureScore", "captureCategory",
     "captureActivity", "captureAverage", "capturePeak", "captureMinimum", "captureDuration",
     "captureBaselineDate", "captureBaselineFeatures", "captureGraph", "captureBaselineGraph", "captureExport",
@@ -191,8 +191,8 @@
     { name: "Morning", range: "06:00–11:59" }, { name: "Afternoon", range: "12:00–17:59" },
     { name: "Evening", range: "18:00–23:59" }, { name: "Night", range: "00:00–05:59" }
   ]
-  const emptyStats = () => ({ count: 0, sum: 0, peak: 0 })
-  const addScore = (stats, score) => { stats.count++; stats.sum += score; stats.peak = Math.max(stats.peak, score) }
+  const emptyStats = () => ({ count: 0, sum: 0, peak: 0, low: 100 })
+  const addScore = (stats, score) => { stats.count++; stats.sum += score; stats.peak = Math.max(stats.peak, score); stats.low = Math.min(stats.low, score) }
   const averageOf = stats => Math.round(stats.sum / stats.count)
   const statsText = stats => t(stats.count === 1 ? "history.calendarDayOne" : "history.calendarDay", { score: averageOf(stats), count: stats.count })
   let summaryMonth = null
@@ -223,18 +223,35 @@
   }
 
   function renderSummaryDay(days) {
-    const { stressSummaryDay, stressSummaryDayDetails } = elements
+    const { stressSummaryDayCard, stressSummaryDay, stressSummaryDayNarrative, stressSummaryDayNext, stressSummaryDayDetails, stressSummaryDayMetrics } = elements
+    stressSummaryDayCard.hidden = !summaryDay
     if (!summaryDay) {
-      stressSummaryDay.textContent = t("history.calendarChooseDay")
+      stressSummaryDay.textContent = ""
+      stressSummaryDayNarrative.textContent = ""
+      stressSummaryDayNext.textContent = ""
       stressSummaryDayDetails.textContent = ""
+      stressSummaryDayMetrics.open = false
       return
     }
     const date = new Date(summaryMonth.getFullYear(), summaryMonth.getMonth(), summaryDay)
     stressSummaryDay.textContent = formatDay(date)
     const stats = days.get(summaryDay)
-    stressSummaryDayDetails.textContent = stats
-      ? statsText(stats) + ". " + t("history.calendarPeak", { score: Math.round(stats.peak) })
-      : t(summaryData?.unavailable ? "history.summaryUnavailable" : !summaryData ? "history.summaryLoading" : summaryData.partial ? "history.calendarNoLoadedDay" : "history.calendarNoCaptureDay")
+    const reading = !summaryData || summaryData.reading
+    const unavailable = summaryData?.unavailable
+    const partial = summaryData?.partial
+    stressSummaryDayMetrics.hidden = !stats
+    if (!stats) {
+      stressSummaryDayNarrative.textContent = t(unavailable ? "history.summaryUnavailable" : reading ? "history.summaryLoading" : partial ? "history.calendarNoLoadedDay" : "history.calendarNoCaptureDay")
+      stressSummaryDayNext.textContent = !reading && !unavailable && !partial ? t("history.calendarDayNextEmpty") : ""
+      stressSummaryDayDetails.textContent = ""
+      return
+    }
+    const low = Math.round(stats.low), peak = Math.round(stats.peak)
+    const description = stats.count === 1 ? "history.calendarDaySingle" : low === peak ? "history.calendarDaySteady" : "history.calendarDaySpread"
+    stressSummaryDayNarrative.textContent = t(description, { count: stats.count }) + (partial ? " " + t("history.todayPartial") : "")
+    stressSummaryDayNext.textContent = t("history.calendarDayNextRepeat")
+    stressSummaryDayDetails.textContent = statsText(stats) + ". " + t("history.calendarPeak", { score: peak })
+      + (stats.count > 1 && low !== peak ? ". " + t("history.calendarDayLow", { score: low }) : "")
   }
 
   function renderSummaryToday(today, bins, { reading, unavailable, partial }) {
@@ -326,7 +343,7 @@
       button.setAttribute("aria-pressed", String(summaryDay === day))
       button.addEventListener("click", () => {
         summaryDay = day
-        elements.stressSummaryDetails.open = true
+        elements.stressSummaryDayMetrics.open = false
         for (const sibling of stressSummaryDays.querySelectorAll("button")) sibling.setAttribute("aria-pressed", String(sibling === button))
         renderSummaryDay(days)
       })
@@ -688,6 +705,9 @@
     elements.stressSummaryDays.replaceChildren()
     elements.stressSummaryTimes.replaceChildren()
     elements.stressSummaryDay.textContent = ""
+    elements.stressSummaryDayMetrics.open = false
+    elements.stressSummaryDayNarrative.textContent = ""
+    elements.stressSummaryDayNext.textContent = ""
     elements.stressSummaryDayDetails.textContent = ""
     elements.stressSummaryOpen.focus({ preventScroll: true })
   })

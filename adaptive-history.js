@@ -16,11 +16,13 @@
     return row?.type === "adaptive" && Number.isSafeInteger(row.completedAt) && row.completedAt >= 0 &&
       row.completedAt < 8640000000000000 && Number.isSafeInteger(row.durationMs) &&
       Number.isSafeInteger(row.count) && row.count > 0 && Math.floor(row.durationMs / windowMs) === row.count &&
-      Number.isInteger(row.score) && row.score >= 0 && row.score <= 100 && presets.includes(row.presetMs) &&
+      Number.isInteger(row.score) && row.score >= 0 && row.score <= 100 &&
+      (row.custom === true ? Number.isSafeInteger(row.presetMs) && row.presetMs % 60000 === 0 && row.presetMs >= 60000 && row.presetMs <= 3600000 :
+        row.custom === undefined && presets.includes(row.presetMs)) &&
       (row.end === "timer" ? row.presetMs > 0 && row.durationMs === row.presetMs :
         row.end === "manual" && (row.presetMs === 0 || row.durationMs < row.presetMs))
   }
-  const compact = ({type, completedAt, durationMs, presetMs, end, count, score}) => ({type, completedAt, durationMs, presetMs, end, count, score})
+  const compact = ({type, completedAt, durationMs, presetMs, end, count, score, custom}) => ({type, completedAt, durationMs, presetMs, end, count, score, ...(custom === true ? {custom} : {})})
   function read(id) {
     const raw = localStorage.getItem(key(id))
     if (!raw) return []
@@ -52,7 +54,7 @@
     date.dateTime = new Date(row.completedAt).toISOString()
     date.textContent = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(row.completedAt)
     estimate.textContent = translate("adaptiveEntryScore", {score:format.format(row.score)})
-    const mode = translate(row.presetMs === 0 ? "unlimited" : row.presetMs === 300000 ? "five" : "ten")
+    const mode = row.custom ? translate("customPreset", {minutes: format.format(row.presetMs / 60000)}) : translate(row.presetMs === 0 ? "unlimited" : row.presetMs === 300000 ? "five" : "ten")
     const ended = row.end === "timer" ? "" : " · " + translate(row.presetMs ? "adaptiveEntryEarly" : "adaptiveEntryManual")
     elapsed.textContent = translate("adaptiveEntryElapsed", {duration:formatDuration(row.durationMs)}) + " · " + mode + ended
     coverage.textContent = translate("coverageElapsed", {count:format.format(row.count), duration:formatDuration(row.count * windowMs)})

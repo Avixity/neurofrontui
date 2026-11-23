@@ -84,8 +84,8 @@ const url = process.env.NEUROFRONT_URL || "http://127.0.0.1:5180"
         await locator("#adaptivePanel").waitFor({ state:"visible" })
         assert.equal(await locator(".chart-panel").isVisible(), false)
         assert.equal(await locator("#adaptiveTime").textContent(), "00:00")
-        assert.deepEqual(await locator("#modeSelect option").evaluateAll(options => options.map(option => option.value)), ["standard","adaptive","adaptive-5","adaptive-10"])
-        assert.equal(await locator("#adaptivePanel select").count(), 0)
+        assert.deepEqual(await locator("#modeSelect option").evaluateAll(options => options.map(option => option.value)), ["standard","adaptive"])
+        assert.deepEqual(await locator("#adaptiveDuration option").evaluateAll(options => options.map(option=>option.value)),["unlimited","5","10","custom"])
         assert.ok(await locator("#adaptiveStart").isDisabled())
         await noOverflow()
         await usableBaseline()
@@ -123,7 +123,7 @@ const url = process.env.NEUROFRONT_URL || "http://127.0.0.1:5180"
           await locator("#connectButton").click()
           await page.waitForFunction(() => state.characteristic)
           for (const minutes of [5, 10]) {
-            await locator("#modeSelect").selectOption("adaptive-" + minutes)
+            await locator("#adaptiveDuration").selectOption(String(minutes))
             const observed = await page.evaluate(minutes => {
               const original = performance.now, start = original.call(performance)
               let simulated = start
@@ -151,7 +151,7 @@ const url = process.env.NEUROFRONT_URL || "http://127.0.0.1:5180"
             assert.match(observed.status, /^Recorded session estimate: \d+\/100$/)
             assert.equal(observed.latest, null)
           }
-          await locator("#modeSelect").selectOption("adaptive")
+          await locator("#adaptiveDuration").selectOption("unlimited")
           const unlimited = await page.evaluate(() => {
             const original = performance.now, start = original.call(performance)
             let simulated = start
@@ -176,6 +176,43 @@ const url = process.env.NEUROFRONT_URL || "http://127.0.0.1:5180"
           assert.equal(unlimited.rows.length,3)
           assert.deepEqual(unlimited.rows.map(({type,presetMs,end,count}) => [type,presetMs,end,count]), [["adaptive",0,"manual",40],["adaptive",600000,"timer",40],["adaptive",300000,"timer",20]])
           assert.ok(unlimited.rows.every(row => Object.keys(row).sort().join(",") === "completedAt,count,durationMs,end,presetMs,score,type"))
+          await locator("#adaptiveDuration").selectOption("custom")
+          const custom=locator("#adaptiveCustomMinutes")
+          for(const invalid of ["","0","61","1.5","1e1"]){
+            await custom.fill(invalid)
+            assert.equal(await custom.getAttribute("aria-invalid"),"true")
+            assert.ok(await locator("#adaptiveStart").isDisabled())
+          }
+          await custom.fill("1")
+          assert.equal(await custom.getAttribute("aria-invalid"),"false")
+          const observedCustom=await page.evaluate(() => {
+            const original = performance.now, start = original.call(performance)
+            let simulated = start
+            performance.now = () => simulated
+            try {
+              shellBle.emit(0)
+              NeuroFrontAdaptive.tick(simulated)
+              document.getElementById("adaptiveStart").click()
+              const settings=document.getElementById("adaptiveDuration"),input=document.getElementById("adaptiveCustomMinutes")
+              const locked=settings.disabled&&input.disabled
+              input.value="60"; input.dispatchEvent(new Event("input"))
+              const frozen=input.value
+              for(let sample=0; sample<1200; sample++){
+                simulated=start+sample*50+1
+                shellBle.emit(Math.sin(sample/6)*10)
+              }
+              simulated=start+60000
+              NeuroFrontAdaptive.tick(simulated)
+              return {locked,frozen,busy:NeuroFrontAdaptive.busy(),latest:JSON.parse(localStorage.getItem("neurofront.adaptiveHistory.v1.guest"))[0]}
+            } finally { performance.now = original; shellBle.emit(0) }
+          })
+          assert.equal(observedCustom.locked,true)
+          assert.equal(observedCustom.frozen,"1")
+          assert.equal(observedCustom.busy,false)
+          assert.equal(observedCustom.latest.custom,true)
+          assert.equal(observedCustom.latest.durationMs,60000)
+          assert.equal(observedCustom.latest.count,4)
+          assert.equal(observedCustom.latest.end,"timer")
           await page.evaluate(() => shellBle.freeze())
           await locator("#adaptiveStart").click()
           await locator("#adaptiveStop").waitFor({ state:"visible" })
@@ -190,8 +227,9 @@ const url = process.env.NEUROFRONT_URL || "http://127.0.0.1:5180"
           await page.reload()
           await page.waitForFunction(() => NeuroFrontAccount.sessionResolved())
           await locator("#adaptiveArchive summary").click()
-          assert.equal(await locator("#adaptiveArchiveList li").count(),3)
-          assert.match(await locator("#adaptiveArchiveList li").first().textContent(), /10:10 elapsed.*Unlimited.*Ended by you/)
+          assert.equal(await locator("#adaptiveArchiveList li").count(),4)
+          assert.match(await locator("#adaptiveArchiveList li").first().textContent(), /01:00 elapsed.*Custom.*1 min/)
+          assert.match(await locator("#adaptiveArchiveList li").nth(1).textContent(), /10:10 elapsed.*Unlimited.*Ended by you/)
           const isolation = await page.evaluate(() => {
             const account = window.NeuroFrontAccount, records = document.getElementById("adaptiveArchiveList")
             let id = "qa-account-a"
@@ -211,7 +249,7 @@ const url = process.env.NEUROFRONT_URL || "http://127.0.0.1:5180"
               return { emptyAtSignIn, saved, signedIn, otherAccount, guest:records.children.length, closed:!document.getElementById("adaptiveArchive").open, stored }
             } finally { window.NeuroFrontAccount = account }
           })
-          assert.deepEqual({...isolation,stored:undefined},{emptyAtSignIn:0,saved:true,signedIn:1,otherAccount:0,guest:3,closed:true,stored:undefined})
+          assert.deepEqual({...isolation,stored:undefined},{emptyAtSignIn:0,saved:true,signedIn:1,otherAccount:0,guest:4,closed:true,stored:undefined})
           assert.equal(Object.keys(isolation.stored[0]).sort().join(","),"completedAt,count,durationMs,end,presetMs,score,type")
         }
         await locator("#modeSelect").selectOption("standard")

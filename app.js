@@ -254,13 +254,27 @@ function updateLeadState() {
   window.NeuroFrontI18n.setText(refs.leadState, isDeviceConnected() ? "Nominal" : "Offline")
 }
 
+function setTextIfChanged(element, text) {
+  if (element.textContent !== text) element.textContent = text
+}
+
+function setFlagIfChanged(element, key, value) {
+  if (element[key] !== value) element[key] = value
+}
+
+function setStyleIfChanged(element, key, value) {
+  if (element.style[key] !== value) element.style[key] = value
+}
+
 function updateStressMeter(score, label, feedback) {
   const clampedScore = clamp(score, 0, 100)
-  refs.stressScore.textContent = `${Math.round(clampedScore)}/100`
-  refs.stressFill.style.width = `${clampedScore}%`
+  setTextIfChanged(refs.stressScore, `${Math.round(clampedScore)}/100`)
+  setStyleIfChanged(refs.stressFill, "width", `${Math.round(clampedScore * 100) / 100}%`)
   window.NeuroFrontI18n.setText(refs.stressLabel, label)
   window.NeuroFrontI18n.setText(refs.stressFeedback, feedback)
-  refs.stressLabel.hidden = refs.stressFeedback.hidden = !state.measurement.completed && !state.measurement.active
+  const hidden = !state.measurement.completed && !state.measurement.active
+  setFlagIfChanged(refs.stressLabel, "hidden", hidden)
+  setFlagIfChanged(refs.stressFeedback, "hidden", hidden)
 }
 
 function estimateWindowScore(sampleWindow, baseline) {
@@ -311,7 +325,7 @@ function refreshStressState(sampleWindow) {
 }
 
 function updateTrendLabel() {
-  refs.tempTrend.dataset.trend = state.temperatureTrend
+  if (refs.tempTrend.dataset.trend !== state.temperatureTrend) refs.tempTrend.dataset.trend = state.temperatureTrend
   if (state.temperatureTrend === "rising") {
     window.NeuroFrontI18n.setText(refs.tempTrendText, "Rising")
     return
@@ -417,7 +431,7 @@ function updateBaselinePicker() {
 }
 
 function syncBaselinePicker() {
-  refs.baselineSelect.disabled = !state.baselineOptions.size || window.NeuroFrontAdaptive?.busy() || state.measurement.active || state.calibration.active || state.flow === "complete"
+  setFlagIfChanged(refs.baselineSelect, "disabled", !state.baselineOptions.size || Boolean(window.NeuroFrontAdaptive?.busy()) || state.measurement.active || state.calibration.active || state.flow === "complete")
   const selectedKey = state.baseline.ready && state.flow !== "baseline"
     ? (state.baselineOptions.has(state.selectedBaselineKey) ? state.selectedBaselineKey :
       [...state.baselineOptions].find(([, record]) => record.createdAt === state.baseline.createdAt)?.[0] || "")
@@ -444,7 +458,7 @@ function loadSavedBaseline() {
 }
 
 function setBaselineTimer(seconds, progress, label, status) {
-  refs.countdownValue.textContent = seconds.toFixed(1)
+  setTextIfChanged(refs.countdownValue, seconds.toFixed(1))
   refs.countdownRing.style.strokeDashoffset = `${RING_CIRCUMFERENCE * progress}`
   window.NeuroFrontI18n.setText(refs.countdownLabel, label)
   window.NeuroFrontI18n.setText(refs.measurementState, status)
@@ -657,7 +671,7 @@ function signalInputMessage(now) {
 function updateSignalDiagnostics(now) {
   if (now - state.diagnosticsUpdatedAt < 250) return
   state.diagnosticsUpdatedAt = now
-  refs.signalDiagnostics.hidden = !isDeviceConnected()
+  setFlagIfChanged(refs.signalDiagnostics, "hidden", !isDeviceConnected())
   const input = state.signalInput
   const min = input.values.length ? Math.min(...input.values) : null
   const max = input.values.length ? Math.max(...input.values) : null
@@ -666,7 +680,7 @@ function updateSignalDiagnostics(now) {
     min: min === null ? "…" : String(min),
     max: max === null ? "…" : String(max)
   })
-  refs.signalPacket.hidden = !input.received
+  setFlagIfChanged(refs.signalPacket, "hidden", !input.received)
   if (input.received) window.NeuroFrontI18n.setMessage(refs.signalPacket, "signal.packet", { packet: input.lastPacket })
 }
 
@@ -832,7 +846,7 @@ function updateMeasurement(now) {
   if (state.calibration.holdTimer) return
   if (!state.measurement.active) {
     refs.countdownRing.style.strokeDasharray = `${RING_CIRCUMFERENCE}`
-    refs.countdownRing.style.strokeDashoffset = state.measurement.completed ? `${RING_CIRCUMFERENCE}` : "0"
+    setStyleIfChanged(refs.countdownRing, "strokeDashoffset", state.measurement.completed ? `${RING_CIRCUMFERENCE}` : "0")
     if (!state.measurement.completed && refs.countdownValue.textContent !== "15.0") {
       refs.countdownValue.textContent = "15.0"
     }
@@ -841,7 +855,7 @@ function updateMeasurement(now) {
   const elapsed = now - state.measurement.startTime
   const remaining = clamp((MEASUREMENT_MS - elapsed) / 1000, 0, MEASUREMENT_MS / 1000)
   const progress = clamp(elapsed / MEASUREMENT_MS, 0, 1)
-  refs.countdownValue.textContent = remaining.toFixed(1)
+  setTextIfChanged(refs.countdownValue, remaining.toFixed(1))
   refs.countdownRing.style.strokeDasharray = `${RING_CIRCUMFERENCE}`
   refs.countdownRing.style.strokeDashoffset = `${RING_CIRCUMFERENCE * progress}`
   if (elapsed >= MEASUREMENT_MS) {
@@ -891,9 +905,9 @@ function updateReadouts() {
   state.displayTemperature = lerp(state.displayTemperature, state.temperature, 0.12)
   state.displayGsr = lerp(state.displayGsr, state.gsr, 0.12)
   const signalSpan = state.axisMax - state.axisMin
-  refs.signalValue.textContent = formatSignalValue(state.displaySignal, signalSpan, 1)
-  refs.tempValue.textContent = state.displayTemperature.toFixed(2)
-  refs.gsrValue.textContent = state.displayGsr.toFixed(1)
+  setTextIfChanged(refs.signalValue, formatSignalValue(state.displaySignal, signalSpan, 1))
+  setTextIfChanged(refs.tempValue, state.displayTemperature.toFixed(2))
+  setTextIfChanged(refs.gsrValue, state.displayGsr.toFixed(1))
   const inputMessage = signalInputMessage(performance.now())
   if (inputMessage && isDeviceConnected()) {
     window.NeuroFrontI18n.setMessage(refs.signalDetail, inputMessage, { value: String(state.bluetoothValue) })
@@ -974,19 +988,19 @@ function updateAxisLabels() {
   }
   const mid = (state.axisMin + state.axisMax) / 2
   const span = state.axisMax - state.axisMin
-  refs.yAxisTop.textContent = formatSignalValue(state.axisMax, span)
-  refs.yAxisMid.textContent = formatSignalValue(mid, span)
-  refs.yAxisBottom.textContent = formatSignalValue(state.axisMin, span)
+  setTextIfChanged(refs.yAxisTop, formatSignalValue(state.axisMax, span))
+  setTextIfChanged(refs.yAxisMid, formatSignalValue(mid, span))
+  setTextIfChanged(refs.yAxisBottom, formatSignalValue(state.axisMin, span))
   state.chart.options.scales.y.min = state.axisMin
   state.chart.options.scales.y.max = state.axisMax
 }
 
 function updateChartState(now) {
   const secondsVisible = MEASUREMENT_MS / 1000
-  refs.xAxisStart.textContent = "0s"
-  refs.xAxisQuarter.textContent = `${(secondsVisible / 3).toFixed(0)}s`
-  refs.xAxisHalf.textContent = `${((secondsVisible * 2) / 3).toFixed(0)}s`
-  refs.xAxisEnd.textContent = `${secondsVisible.toFixed(0)}s`
+  setTextIfChanged(refs.xAxisStart, "0s")
+  setTextIfChanged(refs.xAxisQuarter, `${(secondsVisible / 3).toFixed(0)}s`)
+  setTextIfChanged(refs.xAxisHalf, `${((secondsVisible * 2) / 3).toFixed(0)}s`)
+  setTextIfChanged(refs.xAxisEnd, `${secondsVisible.toFixed(0)}s`)
   const live = hasFreshBluetoothSignal(now)
   const revealed = state.measurement.revealed
   const previewVisible = state.measurement.completed && state.exportSnapshot.buffer.length
@@ -1002,36 +1016,33 @@ function updateChartState(now) {
 
 function updateControlsAvailability(now) {
   syncBaselinePicker()
-  refs.baselineChoices.hidden = state.measurement.active || state.calibration.active || state.flow === "complete"
-  refs.calibrationProgressButton.hidden = state.flow !== "calibrating"
-  refs.measureButton.hidden = state.flow !== "ready" && state.flow !== "measuring"
-  refs.completedActions.hidden = state.flow !== "complete"
-  refs.recalibrateButton.disabled = Boolean(window.NeuroFrontAdaptive?.busy()) || !isDeviceConnected() || !state.characteristic || state.measurement.active || state.calibration.active
-  refs.cancelCalibrationButton.hidden = !state.calibration.active
-  refs.measureButton.disabled = state.measurement.active || !canStartMeasurement()
-  refs.beginMeasurementButton.disabled = !canStartMeasurement()
-  refs.exportButton.disabled = !state.measurement.completed || !state.exportSnapshot.buffer.length
+  setFlagIfChanged(refs.baselineChoices, "hidden", state.measurement.active || state.calibration.active || state.flow === "complete")
+  setFlagIfChanged(refs.calibrationProgressButton, "hidden", state.flow !== "calibrating")
+  setFlagIfChanged(refs.measureButton, "hidden", state.flow !== "ready" && state.flow !== "measuring")
+  setFlagIfChanged(refs.completedActions, "hidden", state.flow !== "complete")
+  setFlagIfChanged(refs.recalibrateButton, "disabled", Boolean(window.NeuroFrontAdaptive?.busy()) || !isDeviceConnected() || !state.characteristic || state.measurement.active || state.calibration.active)
+  setFlagIfChanged(refs.cancelCalibrationButton, "hidden", !state.calibration.active)
+  setFlagIfChanged(refs.measureButton, "disabled", state.measurement.active || !canStartMeasurement())
+  setFlagIfChanged(refs.beginMeasurementButton, "disabled", !canStartMeasurement())
+  setFlagIfChanged(refs.exportButton, "disabled", !state.measurement.completed || !state.exportSnapshot.buffer.length)
   window.NeuroFrontI18n.setText(refs.measureButton, state.measurement.active ? "Measuring…" : "Start Measurement")
 }
 
+let chartFrame = { mode: "", source: null, count: 0, revealed: false }
+
 function updateChart() {
+  const { active, completed, revealed } = state.measurement
+  const mode = active ? "live" : completed ? "preview" : "idle"
+  const source = active ? state.measurement.samples : completed ? state.exportSnapshot.buffer : null
+  const count = source?.length || 0
+  if (chartFrame.mode === mode && chartFrame.source === source && chartFrame.count === count && chartFrame.revealed === revealed) return
+  chartFrame = { mode, source, count, revealed }
   updateAxisLabels()
-  state.chart.data.datasets[0].hidden = !state.measurement.revealed
-  if (state.measurement.active) {
-    const padded = state.measurement.samples.slice()
-    while (padded.length < BUFFER_SIZE) {
-      padded.push(null)
-    }
-    state.chart.data.datasets[0].data = padded
-  } else if (state.measurement.completed && state.exportSnapshot.buffer.length) {
-    const padded = state.exportSnapshot.buffer.slice()
-    while (padded.length < BUFFER_SIZE) {
-      padded.push(null)
-    }
-    state.chart.data.datasets[0].data = padded
-  } else {
-    state.chart.data.datasets[0].data = Array(BUFFER_SIZE).fill(null)
-  }
+  const trace = state.chart.data.datasets[0]
+  trace.hidden = !revealed
+  trace.data = active
+    ? [...source, ...Array(Math.max(0, BUFFER_SIZE - count)).fill(null)]
+    : count ? source.slice() : Array(BUFFER_SIZE).fill(null)
   state.chart.update("none")
 }
 
