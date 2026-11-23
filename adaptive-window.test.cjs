@@ -5,7 +5,7 @@ const vm = require("node:vm")
 const { test } = require("node:test")
 const source = fs.readFileSync(__dirname + "/dashboard-session.js", "utf8")
 function fixture() {
-  const controls = new Map(), events = new Map(), calls = []
+  const controls = new Map(), events = new Map(), calls = [], archive = []
   const baseline = { createdAt: "synthetic", ready: true, mean: 0, rms: 2, stdDev: 2, peakToPeak: 4, derivativeMean: 1 }
   let now = 2000, wall = 1234567890000, owner = "test-owner", connected = true
   const document = { hidden: false, body: { classList: { toggle() {}, remove() {} } },
@@ -17,6 +17,7 @@ function fixture() {
   const state = { baseline, calculationVersion: "synthetic", characteristic: {}, flow:"ready",
     calibration:{ active:false }, measurement:{ active:false }, lastIncomingTime:now }
   const window = { addEventListener() {}, NeuroFrontAccount: { owner: () => owner, deviceBusy() {} },
+    NeuroFrontAdaptiveHistory: { save(record, id) { archive.push({record,id}); return true }, formatDuration: String },
     NeuroFrontI18n: { setText(el, value) { el.textContent = value }, setMessage(el, key, details) {
       el.textContent = key; el.values = details
     } } }
@@ -29,8 +30,7 @@ function fixture() {
   vm.runInContext(source, ctx)
   const el = id => controls.get(id), api = window.NeuroFrontAdaptive
   function start(minutes = 5) {
-    el("modeSelect").value = "adaptive"; el("modeSelect").change()
-    el("adaptiveDuration").value = String(minutes)
+    el("modeSelect").value = minutes ? "adaptive-" + minutes : "adaptive"; el("modeSelect").change()
     el("adaptiveStart").click()
     return now
   }
@@ -39,7 +39,7 @@ function fixture() {
     if (value === undefined) api.tick(now)
     else { state.lastIncomingTime = now; api.sample(value, now, String(value)) }
   }
-  return { start, at, el, api, state, calls, document, events,
+  return { start, at, el, api, state, calls, archive, document, events,
     sleep(){wall += 300000}, switchUser(){owner = "other"}, disconnect(){connected = false} }
 }
 test("10-minute estimate averages forty original-model calls and retains at most one 300-slot window", () => {
@@ -55,6 +55,10 @@ test("10-minute estimate averages forty original-model calls and retains at most
   assert.ok(f.calls.every(call => call.length===300 && call.ref===4))
   assert.equal(f.el("adaptiveStatus").values.score,50)
   assert.equal(f.el("adaptiveTime").textContent,"10:00")
+  assert.equal(f.archive.length,1)
+  assert.equal(f.archive[0].record.end,"timer")
+  assert.equal(f.archive[0].record.durationMs,600000)
+  assert.equal(f.archive[0].record.type,"adaptive")
 })
 test("sparse, flat, stale, stopped, and account-switched inputs never yield an estimate", () => {
   for (const kind of ["sparse","flat","stale","sleep","stop","owner","reset","disconnect","hidden","malformed"]) {
@@ -75,6 +79,7 @@ test("sparse, flat, stale, stopped, and account-switched inputs never yield an e
     assert.notEqual(f.el("adaptiveStatus").textContent,"dash.completed",kind)
     assert.ok(f.el("adaptiveCoverage").hidden,kind)
     assert.equal(f.calls.length,0,kind)
+    assert.equal(f.archive.length,0,kind)
   }
 })
 test("mode selection, signal or missing calibration never auto-start a run", () => {
@@ -82,4 +87,34 @@ test("mode selection, signal or missing calibration never auto-start a run", () 
   f.state.baseline.ready=false;f.start();assert.equal(f.api.busy(),false)
   f.state.baseline.ready=true;f.at(2040,1);assert.equal(f.api.busy(),false)
   f.at(6000);f.el("adaptiveStart").click();assert.equal(f.api.busy(),false)
+})
+test("unlimited runs beyond ten minutes and saves elapsed separately from counted windows on Stop", () => {
+  const f=fixture(), start=f.start(0)
+  const duration=617231
+  for (let i=0; i<Math.ceil(duration/50); i++) f.at(start+50*i,Math.sin(i))
+  f.at(start+duration)
+  assert.equal(f.api.busy(),true)
+  assert.equal(f.archive.length,0)
+  f.el("adaptiveStop").click()
+  assert.equal(f.api.busy(),false)
+  const {record,id}=f.archive[0]
+  assert.equal(id,"test-owner")
+  assert.deepEqual(JSON.parse(JSON.stringify(record)),{type:"adaptive",completedAt:1234567890000,durationMs:duration,presetMs:0,end:"manual",count:41,score:50})
+  assert.equal(f.el("adaptiveTime").textContent,"10:17")
+})
+test("manual early stop is never labeled a finished timed cycle; stale stop never archives", () => {
+  for (const stale of [false,true]) {
+    const f=fixture(), start=f.start(5)
+    for (let t=0;t<15000;t+=50) f.at(start+t,Math.sin(t))
+    f.at(start+15010,3)
+    if (stale) f.sleep()
+    f.el("adaptiveStop").click()
+    assert.equal(f.api.busy(),false)
+    if (stale) assert.equal(f.archive.length,0)
+    else {
+      assert.equal(f.archive[0].record.end,"manual")
+      assert.equal(f.archive[0].record.presetMs,300000)
+      assert.equal(f.archive[0].record.durationMs,15010)
+    }
+  }
 })

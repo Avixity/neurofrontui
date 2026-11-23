@@ -1,4 +1,4 @@
-﻿(() => {
+(() => {
   const DATABASE = "neurofront-captures"
   const STORE = "captures"
   const PAGE_SIZE = 6
@@ -7,7 +7,7 @@
     "historyOpen", "historyClose", "historyDialog", "historyGroups", "historyDialogNotice",
     "stressSummaryDialog", "stressSummaryOpen", "stressSummaryClose", "stressSummaryPrevious", "stressSummaryNext",
     "stressSummaryStatus", "stressSummaryMonth", "stressSummaryWeekdays", "stressSummaryDays", "stressSummaryDay",
-    "stressSummaryDayDetails", "stressSummaryTimes",
+    "stressSummaryDayDetails", "stressSummaryTimes", "stressSummaryToday", "stressSummaryTodayNarrative", "stressSummaryDetails",
     "captureDialog", "captureClose", "captureDate", "captureScore", "captureCategory",
     "captureActivity", "captureAverage", "capturePeak", "captureMinimum", "captureDuration",
     "captureBaselineDate", "captureBaselineFeatures", "captureGraph", "captureBaselineGraph", "captureExport",
@@ -237,13 +237,38 @@
       : t(summaryData?.unavailable ? "history.summaryUnavailable" : !summaryData ? "history.summaryLoading" : summaryData.partial ? "history.calendarNoLoadedDay" : "history.calendarNoCaptureDay")
   }
 
+  function renderSummaryToday(today, bins, { reading, unavailable, partial }) {
+    const { stressSummaryToday, stressSummaryTodayNarrative } = elements
+    stressSummaryToday.hidden = summaryMonth.getTime() !== monthOf(today).getTime()
+    if (stressSummaryToday.hidden) { stressSummaryTodayNarrative.textContent = ""; return }
+    const periods = bins.map((stats, index) => ({ ...stats, name: t("history.calendarPeriod" + timeBins[index].name) })).filter(stats => stats.count)
+    let narrative
+    if (unavailable) narrative = t("history.todayUnavailable")
+    else if (reading && !periods.length) narrative = t("history.todayLoading")
+    else if (!periods.length) narrative = t(partial ? "history.todayNoLoaded" : "history.todayEmpty")
+    else if (periods.length === 1) narrative = t("history.todayOnePeriod", { period: periods[0].name })
+    else {
+      const ranked = [...periods].sort((a, b) => averageOf(b) - averageOf(a))
+      const compared = ranked.every(period => period.count >= 2)
+      if (compared && averageOf(ranked[0]) === averageOf(ranked[1])) narrative = t("history.todayNoStandout")
+      else if (compared) narrative = t("history.todayHigher", { period: ranked[0].name })
+      else {
+        const highest = Math.max(...periods.map(period => period.peak))
+        const peaks = periods.filter(period => period.peak === highest)
+        narrative = peaks.length === 1 ? t("history.todayHighest", { period: peaks[0].name }) : t("history.todaySparseTie")
+      }
+    }
+    if (partial && periods.length && !unavailable) narrative += " " + t("history.todayPartial")
+    stressSummaryTodayNarrative.textContent = narrative
+  }
+
   function renderSummary() {
     if (!elements.stressSummaryDialog.open) return
     const { stressSummaryMonth, stressSummaryDays, stressSummaryWeekdays, stressSummaryStatus, stressSummaryNext, stressSummaryTimes } = elements
     const locale = document.documentElement.lang
     const today = new Date()
     const { scores = [], partial = false, unavailable = false, reading = false } = summaryData || { reading: true }
-    const bins = timeBins.map(emptyStats)
+    const bins = timeBins.map(emptyStats), todayBins = timeBins.map(emptyStats)
     const total = emptyStats(), days = new Map()
     for (const item of scores) {
       const time = new Date(item.completedAt)
@@ -251,7 +276,9 @@
       const day = time.getDate()
       if (!days.has(day)) days.set(day, emptyStats())
       addScore(days.get(day), item.score)
-      addScore(bins[(Math.floor(time.getHours() / 6) + 3) % 4], item.score)
+      const bin = (Math.floor(time.getHours() / 6) + 3) % 4
+      addScore(bins[bin], item.score)
+      if (time <= today && time.toDateString() === today.toDateString()) addScore(todayBins[bin], item.score)
       addScore(total, item.score)
     }
     const monthLabel = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(summaryMonth)
@@ -260,6 +287,7 @@
     const status = unavailable && !total.count ? t("history.summaryUnavailable") : reading && !total.count ? t("history.summaryLoading")
       : t(total.count === 1 ? "history.summaryMonthOne" : total.count ? "history.summaryMonth" : "history.summaryEmptyMonth", { score: averageOf(total), count: total.count })
     stressSummaryStatus.textContent = status + (partial && !unavailable ? " " + t("history.summaryPartial") : "")
+    renderSummaryToday(today, todayBins, { reading, unavailable, partial })
     const weekdayLong = new Intl.DateTimeFormat(locale, { weekday: "long" })
     const weekdayShort = new Intl.DateTimeFormat(locale, { weekday: "short" })
     const number = new Intl.NumberFormat(locale)
@@ -298,6 +326,7 @@
       button.setAttribute("aria-pressed", String(summaryDay === day))
       button.addEventListener("click", () => {
         summaryDay = day
+        elements.stressSummaryDetails.open = true
         for (const sibling of stressSummaryDays.querySelectorAll("button")) sibling.setAttribute("aria-pressed", String(sibling === button))
         renderSummaryDay(days)
       })
@@ -366,7 +395,9 @@
     score.textContent = `${Math.round(record.stress.score)}/100`
     const category = document.createElement("span")
     category.textContent = translatedLabel(record.stress.label)
-    meta.append(score, category)
+    const type = document.createElement("span")
+    type.textContent = t("dash.standard")
+    meta.append(type, score, category)
     content.append(date, meta)
     if (pending.has(record.id)) {
       const status = document.createElement("small")
@@ -652,6 +683,8 @@
     summaryToken++
     summaryData = null
     elements.stressSummaryStatus.textContent = ""
+    elements.stressSummaryTodayNarrative.textContent = ""
+    elements.stressSummaryDetails.open = false
     elements.stressSummaryDays.replaceChildren()
     elements.stressSummaryTimes.replaceChildren()
     elements.stressSummaryDay.textContent = ""

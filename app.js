@@ -1063,7 +1063,7 @@ function animationLoop(now) {
   updateChartState(now)
   updateControlsAvailability(now)
   updateMeasurement(now)
-  window.NeuroFrontAdaptive?.tick(now)
+  window.NeuroFrontAdaptive?.tick(performance.now())
   if (!window.NeuroFrontAdaptive?.selected()) updateChart()
   requestAnimationFrame(animationLoop)
 }

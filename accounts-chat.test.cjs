@@ -73,6 +73,7 @@ const html = `<!doctype html><html lang="en"><head><style>body{margin:20px}butto
     assert.equal(await page.locator("#assistantPanel").isVisible(), false)
     assert.equal(await page.locator("#assistantLaunchArea").isVisible(), true)
     await page.locator("#assistantLauncher").click()
+    await page.waitForFunction(() => document.activeElement.id === "assistantInput")
     await page.keyboard.press("Escape")
     assert.equal(await page.locator("#assistantPanel").isVisible(), false)
     await page.locator("#assistantLauncher").click()

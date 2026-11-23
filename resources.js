@@ -126,6 +126,9 @@
     else toggle?.focus({ preventScroll: true })
   })
   toggle?.addEventListener("click", () => setExpanded(toggle.getAttribute("aria-expanded") !== "true"))
+  document.querySelector('.dashboard-dock a[href="#resourcesToggle"]')?.addEventListener("click", () => {
+    if (toggle.getAttribute("aria-expanded") !== "true") setExpanded(true)
+  })
   let initiallyExpanded = false
   try { initiallyExpanded = localStorage.getItem(preferenceKey) === "true" } catch (_) { /* Start collapsed when storage is unavailable. */ }
   setExpanded(initiallyExpanded, false)

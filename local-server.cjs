@@ -9,7 +9,7 @@ const accountConfig = require("./account-config-api.js")
 const publicFiles = new Set([
   "index.html", "email-preview.html", "recovery-email-preview.html", "styles.css", "app.js", "language.js", "language-data.js",
   "capture-language.js", "capture-history.js", "capture-history.css", "resource-data.js", "resources.js",
-  "dashboard-language.js", "dashboard-session.js", "setup-viewer.js", "score-config.js", "assistant-language.js", "assistant.js",
+  "dashboard-language.js", "dashboard-session.js", "adaptive-history.js", "adaptive-history.css", "setup-viewer.js", "score-config.js", "assistant-language.js", "assistant.js",
   "assistant-avatar.webp", "icon-512.png", "image.png", "NEUROFRONTLOGO.png"
   , "account-store.js", "account-ui.js", "account-language.js", "supabase-2.118.0.js"
 ])

@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="capture-history.css">
+<link rel="stylesheet" href="adaptive-history.css">
 </head>
 <body>
 <div class="app-shell">
@@ -37,7 +38,9 @@
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="5"/><path d="M6 12h3l2-4 2.5 8 2-4H18"/></svg>
         <select id="modeSelect" aria-label="Measurement mode" data-i18n-aria-label="dash.mode">
           <option value="standard" data-i18n="dash.standard">Standard</option>
-          <option value="adaptive" data-i18n="dash.adaptive">Adaptive</option>
+          <option value="adaptive" data-i18n="dash.adaptiveUnlimited">Adaptive · Unlimited</option>
+          <option value="adaptive-5" data-i18n="dash.adaptiveFive">Adaptive · 5 min</option>
+          <option value="adaptive-10" data-i18n="dash.adaptiveTen">Adaptive · 10 min</option>
         </select>
       </label>
       <div class="account-connection-group">
@@ -55,17 +58,20 @@
     </div>
   </header>
 
-  <nav class="dashboard-dock" data-i18n-aria-label="dash.dock" aria-label="Dashboard navigation">
-    <a href="#measurementArea"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13h5l3-8 4 14 3-7h5"/></svg><span data-i18n="dash.measurement">Measurement</span></a>
-    <a href="#summaryTitle"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M7 16v-3m5 3V7m5 9v-6"/></svg><span data-i18n="dash.data">Data</span></a>
+  <div class="dashboard-rail">
+    <nav class="dashboard-dock" data-i18n-aria-label="dash.dock" aria-label="Dashboard navigation">
+      <a href="#measurementArea" aria-label="Measurement" data-i18n-aria-label="dash.measurement"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13h5l3-8 4 14 3-7h5"/></svg><span class="dock-tooltip" aria-hidden="true" data-i18n="dash.measurement">Measurement</span></a>
+      <a href="#summaryTitle" aria-label="Data" data-i18n-aria-label="dash.data"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16M6 16v-4m6 4V6m6 10V9"/></svg><span class="dock-tooltip" aria-hidden="true" data-i18n="dash.data">Data</span></a>
+      <a href="#resourcesToggle" aria-label="Educational Resources" data-i18n-aria-label="dash.resources"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6v14m0-14c-3-2-6-2-9-1v13c3-1 6-1 9 2 3-3 6-3 9-2V5c-3-1-6-1-9 1"/></svg><span class="dock-tooltip" aria-hidden="true" data-i18n="dash.resources">Educational Resources</span></a>
+    </nav>
     <div class="assistant-launch-area" id="assistantLaunchArea">
-  <p class="assistant-callout" id="assistantCallout" role="status" data-i18n="assistant.callout">I can help explain your readings, baselines and NeuroFront setup.</p>
-  <button class="assistant-launcher" id="assistantLauncher" type="button" aria-expanded="false" aria-controls="assistantPanel" aria-haspopup="dialog" aria-label="Open NeuroFront AI" data-i18n-aria-label="assistant.open">
-    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8 8 0 0 1-8 8H8l-4 2v-5a8 8 0 1 1 17-5z"/><path d="M8 10h8m-8 4h5"/></svg>
-    <span id="assistantLauncherLabel">NeuroFront AI</span>
-  </button>
-</div>
-  </nav>
+      <p class="assistant-callout" id="assistantCallout" role="status" data-i18n="assistant.callout">I can help explain your readings, baselines and NeuroFront setup.</p>
+      <button class="assistant-launcher" id="assistantLauncher" type="button" aria-expanded="false" aria-controls="assistantPanel" aria-haspopup="dialog" aria-label="Open NeuroFront AI" data-i18n-aria-label="assistant.open">
+        <img src="assistant-avatar.webp?v=guide-2" width="52" height="52" alt="">
+      </button>
+      <span class="assistant-launcher-label" id="assistantLauncherLabel" aria-hidden="true">NeuroFront AI</span>
+    </div>
+  </div>
   <main class="dashboard" id="measurementArea" tabindex="-1">
       <section class="panel chart-panel">
         <div class="panel-head">
@@ -102,7 +108,6 @@
 
       <section class="panel adaptive-panel" id="adaptivePanel" hidden aria-labelledby="adaptiveTitle">
         <div class="adaptive-heading">
-          <p class="eyebrow" data-i18n="dash.mode">Measurement mode</p>
           <h2 id="adaptiveTitle" data-i18n="dash.session">Adaptive session</h2>
         </div>
         <div class="adaptive-clock">
@@ -111,14 +116,11 @@
           <p id="adaptiveStatus" role="status" data-i18n="dash.missing">Select a baseline and connect with a fresh signal to start.</p>
         </div>
         <div class="adaptive-actions">
-          <label><span data-i18n="dash.duration">Session length</span>
-            <select id="adaptiveDuration"><option value="5" data-i18n="dash.five">5 minutes</option><option value="10" data-i18n="dash.ten">10 minutes</option></select>
-          </label>
-          <button type="button" id="adaptiveStart" class="action-button accent" disabled data-i18n="dash.start">Start session</button>
-          <button type="button" id="adaptiveStop" class="action-button ghost" hidden data-i18n="dash.stop">Stop session</button>
+          <button type="button" id="adaptiveStart" class="action-button accent" disabled data-i18n="dash.start">Start</button>
+          <button type="button" id="adaptiveStop" class="action-button ghost" hidden data-i18n="dash.stop">Stop</button>
         </div>
         <p class="control-note" id="adaptiveCoverage" hidden></p>
-        <p class="control-note" data-i18n="dash.privacy">Recorded session estimate only. Not a medical assessment. Adaptive results stay on this screen and are not added to capture history.</p>
+        <p class="control-note" id="adaptiveSaveStatus" role="status" hidden data-i18n="dash.storageFailed">This browser could not save the session to history.</p>
       </section>
       <section class="panel metric-panel">
         <div class="metric-card emphasis">
@@ -258,6 +260,7 @@
             <p class="section-caption" id="historyStorageLabel" data-i18n="history.local">Saved on this device</p>
           </div>
         </div>
+        <h3 class="section-caption history-section-type" data-i18n="dash.standardHistory">Standard captures</h3>
         <p class="section-empty" id="historyEmpty" data-i18n="history.empty">Your completed captures will appear here.</p>
         <ol class="history-list" id="historyList"></ol>
         <div class="history-status-row">
@@ -266,6 +269,13 @@
         </div>
         <button class="action-button ghost compact-button history-open" id="historyOpen" type="button" aria-haspopup="dialog" aria-controls="historyDialog" hidden data-i18n="history.open">View history</button>
         <p class="history-storage-note control-note" data-i18n="history.storageNote">Captures stay in this browser on this device.</p>
+        <details class="adaptive-archive" id="adaptiveArchive">
+          <summary data-i18n="dash.adaptiveHistory">Adaptive sessions</summary>
+          <p class="control-note" data-i18n="dash.adaptiveHistoryNote">Adaptive estimates are saved only in this browser, even when signed in. Up to 50 sessions are kept. No raw recordings are saved. Not a medical assessment.</p>
+          <p class="section-empty" id="adaptiveArchiveEmpty" hidden data-i18n="dash.adaptiveHistoryEmpty">No Adaptive sessions saved in this browser.</p>
+          <p class="section-empty" id="adaptiveArchiveStatus" role="status" hidden data-i18n="dash.adaptiveHistoryUnavailable">Adaptive history is unavailable in this browser.</p>
+          <ol id="adaptiveArchiveList" class="adaptive-archive-list" tabindex="0" aria-label="Adaptive sessions" data-i18n-aria-label="dash.adaptiveHistory"></ol>
+        </details>
 
       </section>
     </div>
@@ -323,12 +333,16 @@
     </div>
     <button class="action-button ghost compact-button" id="stressSummaryClose" type="button" data-i18n="common.close">Close</button>
   </div>
+  <section class="stress-summary-today" id="stressSummaryToday" aria-labelledby="stressSummaryTodayTitle">
+    <p class="stress-summary-kicker" data-i18n="history.calendarStandard">Standard captures</p>
+    <h3 id="stressSummaryTodayTitle" data-i18n="history.calendarToday">Today's Summary</h3>
+    <p class="control-note" id="stressSummaryTodayNarrative" role="status"></p>
+  </section>
   <div class="stress-calendar-navigation">
     <button class="action-button ghost compact-button" id="stressSummaryPrevious" type="button" aria-label="Previous month" data-i18n-aria-label="history.calendarPrevious"><span aria-hidden="true">←</span></button>
     <h3 id="stressSummaryMonth" aria-live="polite"></h3>
     <button class="action-button ghost compact-button" id="stressSummaryNext" type="button" aria-label="Next month" data-i18n-aria-label="history.calendarNext"><span aria-hidden="true">→</span></button>
   </div>
-  <p class="control-note" id="stressSummaryStatus" role="status"></p>
   <div class="stress-summary-layout">
     <div>
       <table class="stress-calendar" aria-labelledby="stressSummaryMonth">
@@ -343,22 +357,26 @@
         <li><i data-level="4" aria-hidden="true"></i>75–100</li>
       </ul>
     </div>
-    <div class="stress-summary-facts">
-      <section aria-labelledby="stressSummaryDay">
-        <h3 id="stressSummaryDay"></h3>
-        <p class="control-note" id="stressSummaryDayDetails" aria-live="polite"></p>
-      </section>
-      <section aria-labelledby="stressSummaryTimesTitle">
-        <h3 id="stressSummaryTimesTitle" data-i18n="history.calendarTimes">Time of day · this month</h3>
-        <ul class="stress-time-bins" id="stressSummaryTimes"></ul>
-      </section>
-    </div>
+    <details class="stress-summary-details" id="stressSummaryDetails">
+      <summary data-i18n="history.calendarDetails">Capture details</summary>
+      <p class="control-note" id="stressSummaryStatus" role="status"></p>
+      <div class="stress-summary-facts">
+        <section aria-labelledby="stressSummaryDay">
+          <h3 id="stressSummaryDay"></h3>
+          <p class="control-note" id="stressSummaryDayDetails" aria-live="polite"></p>
+        </section>
+        <section aria-labelledby="stressSummaryTimesTitle">
+          <h3 id="stressSummaryTimesTitle" data-i18n="history.calendarTimes">Time of day · this month</h3>
+          <ul class="stress-time-bins" id="stressSummaryTimes"></ul>
+        </section>
+      </div>
+    </details>
   </div>
 </dialog>
 
 <dialog class="content-dialog" id="historyDialog" aria-labelledby="historyDialogTitle">
   <div class="setup-dialog-head">
-    <h2 id="historyDialogTitle" data-i18n="history.title">Capture History</h2>
+    <h2 id="historyDialogTitle" data-i18n="dash.standardHistory">Standard captures</h2>
     <button class="action-button ghost compact-button" id="historyClose" type="button" data-i18n="common.close">Close</button>
   </div>
   <div class="history-date-groups" id="historyGroups"></div>
@@ -484,6 +502,7 @@
 <script src="language.js" defer></script>
 <script src="score-config.js" defer></script>
 <script src="app.js" defer></script>
+<script src="adaptive-history.js" defer></script>
 <script src="dashboard-session.js" defer></script>
 <script src="setup-viewer.js" defer></script>
 <script src="capture-history.js" defer></script>

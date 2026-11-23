@@ -14,6 +14,8 @@
     { "src": "styles.css", "use": "@vercel/static" },
     { "src": "dashboard-language.js", "use": "@vercel/static" },
     { "src": "dashboard-session.js", "use": "@vercel/static" },
+    { "src": "adaptive-history.js", "use": "@vercel/static" },
+    { "src": "adaptive-history.css", "use": "@vercel/static" },
     { "src": "app.js", "use": "@vercel/static" },
     { "src": "language.js", "use": "@vercel/static" },
     { "src": "language-data.js", "use": "@vercel/static" },

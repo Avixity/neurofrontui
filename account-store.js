@@ -8,13 +8,18 @@
   let config = null, client = null, user = null, bucket = null, epoch = 0
   let loading = false, configured = false, error = "", conflict = false, guestAvailable = false
   let loadController = null, flushController = null, flushWork = null, dbPromise = null
-  let applying = false, lastReload = 0, initialized = false, avatarUrl = ""
+  let applying = false, lastReload = 0, initialized = false, sessionResolved = false, avatarUrl = ""
   const owner = () => user?.id || null
   const busy = () => window.NeuroFrontDevice?.busy() || false
   const current = (id, generation = epoch) => owner() === id && epoch === generation
   const empty = id => ({ owner: id, profile: null, baselines: [], captures: [], threads: [], outbox: [], deletedCaptures: [] })
   const fail = code => { const e = new Error(code); e.code = code; return e }
   const event = (name, detail) => document.dispatchEvent(new CustomEvent(name, { detail }))
+  function resolveSession() {
+    if (sessionResolved) return
+    sessionResolved = true
+    event("neurofront:sessionresolved", {})
+  }
   const baselineMetadata = profile => profile?.preferences?.baselineMetadata || {}
   const baselineMeta = (profile, id) => Object.hasOwn(baselineMetadata(profile), id) ? baselineMetadata(profile)[id] : null
   const visibleBaselines = active => (active?.baselines || []).filter(row => !baselineMeta(active.profile, row.id)?.removed)
@@ -432,12 +437,13 @@
   }
   async function changeSession(session) {
     const next = session?.user || null
-    if (next?.id === user?.id) { user = next; emit(); return }
+    if (next?.id === user?.id) { user = next; resolveSession(); emit(); return }
     const generation = ++epoch
     const previousOwner = owner()
     loadController?.abort(); flushController?.abort(); flushWork = null
     threadRevisions.clear()
     user = next; bucket = null; avatarUrl = ""; loading = false; error = ""; conflict = false; guestAvailable = false
+    resolveSession()
     event("neurofront:accountreset", { previousOwner, nextOwner: next?.id || null })
     window.NeuroFrontDevice?.resetForAccount()
     emit()
@@ -518,7 +524,8 @@
     try {
       const response = await fetch("/api/account-config", { signal: AbortSignal.timeout(10000) })
       config = await response.json()
-      if (!response.ok || !config.configured) { configured = false; emit(); return }
+      if (!response.ok) throw fail("configuration")
+      if (!config.configured) { configured = false; resolveSession(); emit(); return }
       if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(config.url) || typeof config.publishableKey !== "string") throw fail("configuration")
       await new Promise((resolve, reject) => {
         const script = document.createElement("script")
@@ -542,7 +549,11 @@
       const result = await client.auth.getSession()
       if (result.error) throw fail("authentication")
       await changeSession(result.data.session)
-    } catch (e) { error = e.code || "configuration"; emit() }
+    } catch (e) {
+      error = e.code || "configuration"
+      try { if (!user && localStorage.getItem("neurofront.auth") === null) resolveSession() } catch {}
+      emit()
+    }
   }
   document.addEventListener("neurofront:languagechange", () => {
     if (!applying && user && bucket?.profile) updateProfile({ preferences: { language: document.documentElement.lang } }).catch(e => { error = e.code; emit() })
@@ -553,7 +564,7 @@
   document.addEventListener("neurofront:devicebusy", emit)
   window.addEventListener("online", () => { if (owner()) { error = ""; flush().then(() => refresh()) } })
   window.addEventListener("focus", () => { if (owner() && Date.now() - lastReload > 45000 && !bucket?.outbox.length) refresh() })
-  window.NeuroFrontAccount = Object.freeze({ getState: snapshot, owner, isCurrent: id => owner() === id, accessToken, deviceBusy: emit,
+  window.NeuroFrontAccount = Object.freeze({ getState: snapshot, owner, sessionResolved: () => sessionResolved, isCurrent: id => owner() === id, accessToken, deviceBusy: emit,
     signIn, signUp, recover, updatePassword, signOut, updateProfile, setActiveBaseline, changeSavedBaseline, uploadAvatar,
     saveBaseline, saveCapture, deleteCapture, saveThread, importGuest, selectThread, reload: () => refresh(true),
     retry: async () => { if (conflict) throw fail("conflict"); error = ""; await flush(); if (!bucket?.outbox.length) await refresh() },

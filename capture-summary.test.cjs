@@ -26,7 +26,7 @@ test('monthly stress summary counts only saved captures in the active account an
   }
   const monthStart = new Date(2026, 10, 1)
   const date = (day, hour = 12) => new Date(monthStart.getFullYear(), monthStart.getMonth(), day, hour).toISOString()
-  class TestDate extends Date { constructor(...args) { super(...(args.length ? args : [date(15)])) } }
+  class TestDate extends Date { constructor(...args) { super(...(args.length ? args : [date(15, 22)])) } }
   const capture = (id, completedAt, score, cloudSaved = true) => ({
     id, completedAt, startedAt: completedAt, cloudSaved, schemaVersion: 1, durationMs: 1000, sampleIntervalMs: 50, unit: 'uV', samples: [1, 2],
     axisMin: 0, axisMax: 3, stress: { score, label: 'Balanced' }, summary: { average: 1, peak: 2, minimum: 1, activityLabel: 'Stable' },
@@ -48,6 +48,19 @@ test('monthly stress summary counts only saved captures in the active account an
   assert.equal(field('stressSummaryDialog').open, true)
   assert.equal(field('stressSummaryMonth').textContent, 'November 2026')
   assert.match(field('stressSummaryStatus').textContent, /30\/100 average across 4 saved captures/)
+  assert.match(field('stressSummaryTodayNarrative').textContent, /No Standard captures/)
+  const base = account.captures.slice()
+  const addToday = (...items) => {
+    account.captures = [...base, ...items]
+    document.listeners['neurofront:accountrecords']({ detail: { owner: 'account-a' } })
+    return field('stressSummaryTodayNarrative').textContent
+  }
+  assert.match(addToday(capture('morning1', date(15, 8), 80)), /only cover the morning/)
+  assert.match(addToday(capture('morning1', date(15, 8), 80), capture('afternoon1', date(15, 14), 15)), /highest saved reading was taken during the morning.*aren't enough/)
+  assert.match(addToday(capture('morning1', date(15, 8), 80), capture('morning2', date(15, 9), 60), capture('afternoon1', date(15, 14), 15), capture('afternoon2', date(15, 15), 35)), /averaged higher during the morning/)
+  assert.doesNotMatch(field('stressSummaryTodayNarrative').textContent, /[\d:]|exercise/)
+  assert.match(addToday(capture('morning1', date(15, 8), 60), capture('morning2', date(15, 9), 40), capture('afternoon1', date(15, 14), 70), capture('afternoon2', date(15, 15), 30)), /No single part/)
+  addToday()
   const day = number => field('stressSummaryDays').querySelectorAll('button').find(button => Number(button.dataset.summaryDay) === number)
   assert.equal(field('stressSummaryWeekdays').children.length, 7)
   assert.equal(field('stressSummaryDays').querySelectorAll('button').length, 30)
@@ -59,6 +72,7 @@ test('monthly stress summary counts only saved captures in the active account an
   assert.match(field('stressSummaryTimes').children[3].children[1].textContent, /0\/100 average · 1 capture/)
   field('stressSummaryPrevious').listeners.click()
   assert.equal(field('stressSummaryMonth').textContent, 'October 2026')
+  assert.equal(field('stressSummaryToday').hidden, true)
   assert.match(field('stressSummaryStatus').textContent, /100\/100 average from 1 saved capture/)
   field('stressSummaryNext').listeners.click()
   assert.equal(field('stressSummaryMonth').textContent, 'November 2026')

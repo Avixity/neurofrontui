@@ -3,7 +3,7 @@
 .history-date-group h3 { margin: 0 0 8px; font-size: 0.95rem; }
 .stress-summary-launch { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
 .stress-summary-launch h3 { margin: 0 0 3px; font-size: 0.95rem; }
-.stress-summary-dialog { --calendar-empty: #242b38; --calendar-l1: #1c3f43; --calendar-l2: #1d5f65; --calendar-l3: #188284; --calendar-l4: #57d5c3; }
+.stress-summary-dialog { --calendar-empty: #1f2531; --calendar-l1: #354d83; --calendar-l2: #216a65; --calendar-l3: #d6a047; --calendar-l4: #fff0a0; }
 .stress-summary-dialog .setup-dialog-head { align-items: start; }
 .stress-calendar-navigation { display: flex; align-items: center; gap: 10px; }
 .stress-calendar-navigation h3 { flex: 1; margin: 0; text-align: center; font-size: 1rem; }
@@ -13,18 +13,34 @@
 .stress-calendar { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 3px; }
 .stress-calendar th { color: var(--muted); font-size: 0.73rem; padding: 0 0 4px; font-weight: 500; text-align: center; }
 .stress-calendar td { padding: 0; }
-.stress-calendar-day { display: grid; place-items: center; background: var(--tile); color: #fff; border: 1px solid transparent; width: 100%; min-height: 31px; border-radius: 5px; font: 600 0.85rem Inter, system-ui, sans-serif; cursor: pointer; }
-.stress-calendar-day[aria-pressed="true"] { border-color: #ecffff; }
+.stress-calendar-day { position: relative; padding: 0 0 4px; display: grid; place-items: center; background: var(--tile); color: #fff; border: 1px solid transparent; width: 100%; min-height: 31px; border-radius: 5px; font: 600 0.85rem Inter, system-ui, sans-serif; cursor: pointer; }
+.stress-calendar-day[aria-pressed="true"] { outline: 2px solid #ecffff; outline-offset: 0; border-color: #182132; }
 .stress-calendar-day[aria-current="date"] { text-decoration: underline; text-underline-offset: 3px; }
 .stress-calendar-day:disabled { cursor: default; color: #a7b5c5; opacity: 0.58; }
-.stress-summary-dialog [data-level="empty"] { --tile: var(--calendar-empty); }
-.stress-summary-dialog [data-level="1"] { --tile: var(--calendar-l1); }
-.stress-summary-dialog [data-level="2"] { --tile: var(--calendar-l2); }
-.stress-summary-dialog [data-level="3"] { --tile: var(--calendar-l3); color: #fff; background: #177275; }
-.stress-summary-dialog [data-level="4"] { --tile: var(--calendar-l4); color: #071e20; }
+.stress-summary-dialog [data-level="empty"] { --tile: repeating-linear-gradient(135deg, var(--calendar-empty) 0 4px, #282e3b 4px 5px); }
+.stress-summary-dialog [data-level="1"] { --tile: var(--calendar-l1); --marks: 3px; }
+.stress-summary-dialog [data-level="2"] { --tile: var(--calendar-l2); --marks: 8px; }
+.stress-summary-dialog [data-level="3"] { --tile: var(--calendar-l3); --marks: 13px; color: #201505; }
+.stress-summary-dialog [data-level="4"] { --tile: var(--calendar-l4); --marks: 18px; color: #201505; }
+.stress-summary-dialog :is(button, i)[data-level]:not([data-level="empty"])::after {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: var(--marks);
+  height: 2px;
+  background: repeating-linear-gradient(to right, currentColor 0 3px, transparent 3px 5px);
+}
+.stress-summary-today { padding: 12px 14px; margin: 0 0 14px; background: #161e2c; border-inline-start: 3px solid var(--accent); border-radius: var(--radius-sm); }
+.stress-summary-today h3 { margin: 4px 0; font-size: 1rem; }
+.stress-summary-kicker { color: var(--muted); font-weight: 600; font-size: 0.72rem; letter-spacing: 0.05em; }
+.stress-summary-details > summary { cursor: pointer; color: var(--text); padding: 8px 0; }
+.stress-summary-details > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .stress-calendar-legend { list-style: none; padding: 0; margin: 12px 3px 0; display: flex; flex-wrap: wrap; gap: 7px 9px; color: var(--muted); font-size: 0.72rem; }
 .stress-calendar-legend li { display: flex; align-items: center; gap: 4px; }
-.stress-calendar-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 2px; background: var(--tile); }
+.stress-calendar-legend i { position: relative; display: inline-block; width: 22px; height: 12px; border-radius: 2px; background: var(--tile); color: #fff; }
+.stress-calendar-legend i:is([data-level="3"], [data-level="4"]) { color: #201505; }
 .stress-summary-facts { display: grid; gap: 12px; align-content: start; }
 .stress-summary-facts section { background: rgba(10, 16, 25, 0.72); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; }
 .stress-summary-facts h3 { font-size: 0.9rem; margin: 0 0 7px; }

@@ -84,7 +84,8 @@ const url = process.env.NEUROFRONT_URL || "http://127.0.0.1:5180"
         await locator("#adaptivePanel").waitFor({ state:"visible" })
         assert.equal(await locator(".chart-panel").isVisible(), false)
         assert.equal(await locator("#adaptiveTime").textContent(), "00:00")
-        assert.equal(await locator("#adaptiveDuration option").count(), 2)
+        assert.deepEqual(await locator("#modeSelect option").evaluateAll(options => options.map(option => option.value)), ["standard","adaptive","adaptive-5","adaptive-10"])
+        assert.equal(await locator("#adaptivePanel select").count(), 0)
         assert.ok(await locator("#adaptiveStart").isDisabled())
         await noOverflow()
         await usableBaseline()
@@ -107,7 +108,7 @@ const url = process.env.NEUROFRONT_URL || "http://127.0.0.1:5180"
         await locator("#adaptiveStart").click()
         await locator("#adaptiveStop").waitFor({ state:"visible" })
         await locator("#adaptiveStop").click()
-        assert.match(await locator("#adaptiveStatus").textContent(), /discarded/i)
+        assert.match(await locator("#adaptiveStatus").textContent(), /Nothing was saved/i)
         assert.ok(await locator("#adaptiveCoverage").isHidden())
         await page.evaluate(() => shellBle.emit(1))
         await locator("#adaptiveStart").click()
@@ -122,7 +123,7 @@ const url = process.env.NEUROFRONT_URL || "http://127.0.0.1:5180"
           await locator("#connectButton").click()
           await page.waitForFunction(() => state.characteristic)
           for (const minutes of [5, 10]) {
-            await locator("#adaptiveDuration").selectOption(String(minutes))
+            await locator("#modeSelect").selectOption("adaptive-" + minutes)
             const observed = await page.evaluate(minutes => {
               const original = performance.now, start = original.call(performance)
               let simulated = start
@@ -146,10 +147,35 @@ const url = process.env.NEUROFRONT_URL || "http://127.0.0.1:5180"
             assert.equal(observed.started, true)
             assert.equal(observed.busy, false)
             assert.equal(observed.timer, String(minutes).padStart(2,"0") + ":00")
-            assert.match(observed.coverage, new RegExp("^" + minutes * 4 + " complete"))
+            assert.match(observed.coverage, new RegExp("^" + minutes * 4 + " full"))
             assert.match(observed.status, /^Recorded session estimate: \d+\/100$/)
             assert.equal(observed.latest, null)
           }
+          await locator("#modeSelect").selectOption("adaptive")
+          const unlimited = await page.evaluate(() => {
+            const original = performance.now, start = original.call(performance)
+            let simulated = start
+            performance.now = () => simulated
+            try {
+              shellBle.emit(0)
+              NeuroFrontAdaptive.tick(simulated)
+              document.getElementById("adaptiveStart").click()
+              for (let sample = 0; sample < 12211; sample++) {
+                simulated = start + sample * 50 + 1
+                shellBle.emit(Math.sin(sample / 6) * 10)
+              }
+              const running = NeuroFrontAdaptive.busy()
+              document.getElementById("adaptiveStop").click()
+              return { running, busy: NeuroFrontAdaptive.busy(), timer: document.getElementById("adaptiveTime").textContent,
+                rows: JSON.parse(localStorage.getItem("neurofront.adaptiveHistory.v1.guest")) }
+            } finally { performance.now = original; shellBle.emit(0) }
+          })
+          assert.equal(unlimited.running,true)
+          assert.equal(unlimited.busy,false)
+          assert.equal(unlimited.timer,"10:10")
+          assert.equal(unlimited.rows.length,3)
+          assert.deepEqual(unlimited.rows.map(({type,presetMs,end,count}) => [type,presetMs,end,count]), [["adaptive",0,"manual",40],["adaptive",600000,"timer",40],["adaptive",300000,"timer",20]])
+          assert.ok(unlimited.rows.every(row => Object.keys(row).sort().join(",") === "completedAt,count,durationMs,end,presetMs,score,type"))
           await page.evaluate(() => shellBle.freeze())
           await locator("#adaptiveStart").click()
           await locator("#adaptiveStop").waitFor({ state:"visible" })
@@ -161,6 +187,32 @@ const url = process.env.NEUROFRONT_URL || "http://127.0.0.1:5180"
           await locator("#adaptiveStop").waitFor({ state:"hidden" })
           assert.match(await locator("#adaptiveStatus").textContent(), /tab hidden/i)
           assert.equal(await locator("#adaptiveCoverage").isVisible(), false)
+          await page.reload()
+          await page.waitForFunction(() => NeuroFrontAccount.sessionResolved())
+          await locator("#adaptiveArchive summary").click()
+          assert.equal(await locator("#adaptiveArchiveList li").count(),3)
+          assert.match(await locator("#adaptiveArchiveList li").first().textContent(), /10:10 elapsed.*Unlimited.*Ended by you/)
+          const isolation = await page.evaluate(() => {
+            const account = window.NeuroFrontAccount, records = document.getElementById("adaptiveArchiveList")
+            let id = "qa-account-a"
+            window.NeuroFrontAccount = { owner: () => id, sessionResolved: () => true, getState: () => id ? {user:{id}, captures:[]} : {user:null,captures:[]} }
+            const dispatch = () => document.dispatchEvent(new CustomEvent("neurofront:accountreset", {detail:{nextOwner:id}}))
+            try {
+              dispatch()
+              const emptyAtSignIn = records.children.length
+              const saved = NeuroFrontAdaptiveHistory.save({ type:"adaptive", completedAt:Date.now(), durationMs:15000, presetMs:0, end:"manual", count:1, score:7, samples:[8], baseline:[9] }, id)
+              const signedIn = records.children.length
+              const stored = JSON.parse(localStorage.getItem("neurofront.adaptiveHistory.v1.owner.qa-account-a"))
+              id = "qa-account-b"
+              dispatch()
+              const otherAccount = records.children.length
+              id = null
+              dispatch()
+              return { emptyAtSignIn, saved, signedIn, otherAccount, guest:records.children.length, closed:!document.getElementById("adaptiveArchive").open, stored }
+            } finally { window.NeuroFrontAccount = account }
+          })
+          assert.deepEqual({...isolation,stored:undefined},{emptyAtSignIn:0,saved:true,signedIn:1,otherAccount:0,guest:3,closed:true,stored:undefined})
+          assert.equal(Object.keys(isolation.stored[0]).sort().join(","),"completedAt,count,durationMs,end,presetMs,score,type")
         }
         await locator("#modeSelect").selectOption("standard")
         await checkTimer()
