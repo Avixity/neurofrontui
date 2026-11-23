@@ -1514,3 +1514,96 @@ html[lang="ur"] .assistant-messages, html[lang="ur"] .assistant-context, html[la
   .account-profile-avatar { width: 52px; height: 52px; flex-basis: 52px; }
   .account-identity { align-items: flex-start; gap: 10px; }
 }
+
+/* Dashboard shell and measurement modes */
+.dashboard-dock, .connection-controls :is(.status-pill, .profile-button) {
+  color: #f7fbff;
+  background: linear-gradient(150deg,#2b3745,#18222d 82%);
+  border: 1px solid rgba(223,239,250,.23);
+  box-shadow: inset 0 1px rgba(255,255,255,.09), 0 5px 18px rgba(0,0,0,.16);
+}
+@supports ((backdrop-filter:blur(12px)) or (-webkit-backdrop-filter:blur(12px))) {
+  .dashboard-dock, .connection-controls :is(.status-pill, .profile-button) {
+    background: linear-gradient(145deg,rgba(63,77,92,.72),rgba(25,34,46,.8));
+    -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px);
+  }
+}
+.connection-controls .status-pill { min-width:0; min-height:44px; padding:9px 13px; gap:8px; }
+.connection-controls .language-button { width:auto!important; height:auto!important; }
+.connection-controls .profile-button { min-width:44px; min-height:44px; }
+.connection-controls .mode-picker { display:inline-flex; padding:0 8px 0 13px; cursor:pointer; }
+.mode-picker svg, .dashboard-dock svg { flex:none; width:20px; height:20px; color:#fff; }
+.mode-picker select, .adaptive-actions select {
+  color-scheme:dark; background:transparent; color:inherit; font:inherit; cursor:pointer;
+}
+.mode-picker select { min-height:42px; max-width:12rem; border:0; padding-right:2px; }
+.mode-picker select option, .adaptive-actions select option { color:#fff; background:#202a36; }
+.mode-picker:focus-within, .dashboard-dock :is(a,button):focus-visible, .adaptive-actions :focus-visible {
+  outline:2px solid #8ceacc; outline-offset:3px;
+}
+.dashboard-dock {
+  position:fixed; left:14px; top:50%; transform:translateY(-50%); z-index:22; width:88px;
+  display:grid; align-items:start; gap:3px; padding:6px; border-radius:23px;
+}
+.dashboard-dock a, .dashboard-dock .assistant-launcher {
+  position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-width:0; min-height:60px; height:auto; width:100%; padding:7px 2px; gap:6px;
+  color:#f4f8fc; font:inherit; font-size:.68rem; line-height:1.25; font-weight:550; text-align:center;
+  text-decoration:none; overflow-wrap:anywhere; border:0; border-radius:16px; background:transparent; box-shadow:none;
+}
+.dashboard-dock :is(a,button):hover { background:rgba(241,248,255,.09); }
+.dashboard-dock .assistant-launch-area { position:relative; inset:auto; display:block; z-index:auto; }
+.dashboard-dock .assistant-launcher::before, .dashboard-dock .assistant-callout { display:none; }
+#measurementArea:focus:not(:focus-visible), #summaryTitle:focus:not(:focus-visible) { outline:none; }
+@media(min-width:1001px) {
+  .app-shell { width:min(1400px,calc(100% - 134px)); margin-inline:max(114px,calc((100vw - 1400px)/2)) auto; }
+}
+@media(max-width:1000px) {
+  .dashboard-dock { position:static; transform:none; display:flex; align-self:flex-start; width:auto; max-width:100%;
+    flex-wrap:wrap; padding:4px; gap:2px; border-radius:16px; }
+  .dashboard-dock > * { flex:1 1 auto; }
+  .dashboard-dock a,.dashboard-dock .assistant-launcher { flex-direction:row; min-height:44px; padding:5px 9px; font-size:.78rem; gap:6px; border-radius:12px; }
+  .dashboard-dock a { width:auto; }
+  .dashboard-dock svg { width:17px; height:17px; }
+}
+.countdown-core { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-content:center; align-items:baseline; gap:0; transform:none; direction:ltr; }
+.countdown-core #countdownValue { grid-column:2; font-variant-numeric:tabular-nums; text-align:center; }
+.countdown-core small { grid-column:3; justify-self:start; margin-left:2px; font-size:.7rem; font-weight:600; letter-spacing:0; }
+.stress-baseline-picker { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:7px; }
+.stress-baseline-picker > label,.stress-baseline-picker .control-note { grid-column:1 / -1; }
+.stress-baseline-picker .baseline-buttons { display:block; }
+.stress-baseline-picker :is(.action-button,select) { min-height:44px; }
+.stress-baseline-picker .control-note:empty { display:none; }
+.stress-baseline-picker .action-button { padding:7px 10px; width:auto; min-width:0; max-width:100%; overflow-wrap:anywhere; }
+.adaptive-panel { grid-area:chart; display:flex; flex-direction:column; gap:16px; padding:clamp(18px,3vw,38px); background:linear-gradient(140deg,#192831,#101a24 66%); }
+.adaptive-heading .eyebrow { margin-bottom:7px; }
+.adaptive-clock { flex:auto; min-height:225px; display:grid; align-content:center; gap:12px; }
+#adaptiveTime { color:#f3f8fa; font-size:clamp(3.8rem,8vw,8rem); font-weight:550; line-height:1; letter-spacing:-.065em; font-variant-numeric:tabular-nums; direction:ltr; }
+#adaptiveStatus { line-height:1.5; color:#d2e1e7; margin:0; }
+.adaptive-actions { display:flex; flex-wrap:wrap; align-items:flex-end; gap:12px; }
+.adaptive-actions label { display:grid; gap:5px; color:#c4d4df; font-size:.84rem; }
+.adaptive-actions select { min-height:44px; padding:7px 12px; border:1px solid var(--border-strong); border-radius:11px; }
+.mode-adaptive .chart-panel,.mode-adaptive .metric-panel > .metric-card:not(.stress-card),
+.mode-adaptive .stress-card > :not(.stress-baseline-picker):not(.baseline-note),
+.mode-adaptive .controls-panel .session-action-area { display:none; }
+.mode-adaptive .metric-panel { display:flex; align-items:center; }
+.mode-adaptive .stress-card { width:100%; }
+.mode-adaptive:not(.adaptive-calibrating) .timer-panel { display:none; }
+.mode-adaptive:not(.adaptive-calibrating) .lower-controls { grid-column:1 / -1; }
+.mode-adaptive #adaptiveCoverage:not([hidden]) { color:var(--accent); }
+@media(max-width:540px) {
+  .topbar { gap:12px; }
+  .connection-controls { column-gap:6px; row-gap:7px; }
+  .connection-controls .status-pill { font-size:.85rem; padding-inline:10px; }
+  .connection-controls .mode-picker { padding:0 5px 0 10px; }
+  .connection-controls .account-connection-group { gap:6px; }
+  .adaptive-clock { min-height:160px; }
+  .stress-baseline-picker { grid-template-columns:minmax(0,1fr); }
+}
+@media (prefers-reduced-motion:reduce) {
+  .connection-controls *, .dashboard-dock *, .adaptive-panel *, .countdown-card * { animation:none!important; transition:none!important; }
+}
+@media (forced-colors:active) {
+  .dashboard-dock,.connection-controls :is(.status-pill,.profile-button) { border:1px solid ButtonText; background:Canvas; color:CanvasText; }
+  .dashboard-dock svg,.mode-picker svg { color:ButtonText; }
+}

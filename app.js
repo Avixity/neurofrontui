@@ -46,9 +46,7 @@ const refs = {
   beginMeasurementButton: document.getElementById("beginMeasurementButton"),
   exportButton: document.getElementById("exportButton"),
   recalibrateButton: document.getElementById("recalibrateButton"),
-  savedBaselineButton: document.getElementById("savedBaselineButton"),
   cancelCalibrationButton: document.getElementById("cancelCalibrationButton"),
-  savedBaselineInfo: document.getElementById("savedBaselineInfo"),
   baselineActionStatus: document.getElementById("baselineActionStatus"),
   countdownLabel: document.getElementById("countdownLabel"),
   countdownCard: document.getElementById("countdownCard"),
@@ -223,7 +221,7 @@ function isDeviceConnected() {
 }
 
 function canStartMeasurement() {
-  return Boolean(state.flow === "ready" && state.characteristic && isDeviceConnected() && state.baseline.ready && !state.calibration.active)
+  return Boolean(!window.NeuroFrontAdaptive?.selected() && !document.hidden && state.flow === "ready" && state.characteristic && isDeviceConnected() && state.baseline.ready && !state.calibration.active)
 }
 
 function setStatus(status) {
@@ -262,9 +260,15 @@ function updateStressMeter(score, label, feedback) {
   refs.stressFill.style.width = `${clampedScore}%`
   window.NeuroFrontI18n.setText(refs.stressLabel, label)
   window.NeuroFrontI18n.setText(refs.stressFeedback, feedback)
-  const hasBaseline = state.baseline.ready &&
-    (state.measurement.completed || (state.flow !== "baseline" && !state.calibration.active))
-  window.NeuroFrontI18n.setText(refs.baselineNote, hasBaseline ? "Baseline set at 50/100" : "No baseline selected")
+  refs.stressLabel.hidden = refs.stressFeedback.hidden = !state.measurement.completed && !state.measurement.active
+}
+
+function estimateWindowScore(sampleWindow, baseline) {
+  const current = computeSignalFeatures(sampleWindow)
+  const baselineActivity = Math.max(1, compositeActivity(baseline))
+  const currentActivity = compositeActivity(current)
+  const relativeDelta = (currentActivity - baselineActivity) / baselineActivity
+  return clamp(50 + relativeDelta * 38, 0, 100)
 }
 
 function refreshStressState(sampleWindow) {
@@ -298,12 +302,7 @@ function refreshStressState(sampleWindow) {
     updateStressMeter(50, "Baseline Ready", state.stress.feedback)
     return
   }
-  const current = computeSignalFeatures(sampleWindow)
-  const baseline = state.measurement.baseline || state.baseline
-  const baselineActivity = Math.max(1, compositeActivity(baseline))
-  const currentActivity = compositeActivity(current)
-  const relativeDelta = (currentActivity - baselineActivity) / baselineActivity
-  const score = clamp(50 + relativeDelta * 38, 0, 100)
+  const score = estimateWindowScore(sampleWindow, state.measurement.baseline || state.baseline)
   const { label, feedback } = window.NeuroFrontScore.classify(score)
   state.stress.score = score
   state.stress.label = label
@@ -414,7 +413,7 @@ function updateBaselinePicker() {
 }
 
 function syncBaselinePicker() {
-  refs.baselineSelect.disabled = !state.baselineOptions.size || state.measurement.active || state.calibration.active || state.flow === "complete"
+  refs.baselineSelect.disabled = !state.baselineOptions.size || window.NeuroFrontAdaptive?.busy() || state.measurement.active || state.calibration.active || state.flow === "complete"
   const selectedKey = state.baseline.ready && state.flow !== "baseline"
     ? (state.baselineOptions.has(state.selectedBaselineKey) ? state.selectedBaselineKey :
       [...state.baselineOptions].find(([, record]) => record.createdAt === state.baseline.createdAt)?.[0] || "")
@@ -424,13 +423,6 @@ function syncBaselinePicker() {
 
 function updateSavedBaselineInfo() {
   updateBaselinePicker()
-  if (!state.savedBaseline) {
-    window.NeuroFrontI18n.setText(refs.savedBaselineInfo, "No saved baseline yet.")
-    return
-  }
-  const date = new Intl.DateTimeFormat(document.documentElement.lang, { dateStyle: "short", timeStyle: "short" })
-    .format(new Date(state.savedBaseline.createdAt))
-  window.NeuroFrontI18n.setMessage(refs.savedBaselineInfo, "baseline.savedAt", { date })
 }
 
 function loadSavedBaseline() {
@@ -468,7 +460,7 @@ function updateAccountBaselineNotice() {
 }
 
 function startCalibration() {
-  if (!state.characteristic || !isDeviceConnected() || state.measurement.active || state.calibration.active) return
+  if (!state.characteristic || !isDeviceConnected() || window.NeuroFrontAdaptive?.busy() || state.measurement.active || state.calibration.active) return
   baselineSaveNotice = null
   state.selectedBaselineKey = ""
   state.calibration = { active: true, startTime: performance.now(), samples: [], holdTimer: false }
@@ -493,12 +485,8 @@ function cancelCalibration(message = "Calibration cancelled. Your previous basel
   updateControlsAvailability(performance.now())
 }
 
-function useSavedBaseline() {
-  selectBaselineRecord(state.savedBaseline)
-}
-
 function selectBaselineRecord(record, selectedKey = "") {
-  if (state.measurement.active || state.calibration.active || state.flow === "complete" || !validateSavedBaseline(record)) return
+  if (window.NeuroFrontAdaptive?.busy() || state.measurement.active || state.calibration.active || state.flow === "complete" || !validateSavedBaseline(record)) return
   baselineSaveNotice = null
   state.selectedBaselineKey = selectedKey
   state.baseline = { ...record.features, samples: record.samples.slice(), ready: true, createdAt: record.createdAt }
@@ -649,7 +637,7 @@ function nextBluetoothValue(now) {
 
 function hasFreshBluetoothSignal(now) {
   return Boolean(state.lastIncomingTime && state.signalInput.lastPacketValid !== false &&
-    now - state.lastIncomingTime < SIGNAL_TIMEOUT_MS &&
+    now - state.lastIncomingTime < (state.measurement.active ? 250 : SIGNAL_TIMEOUT_MS) &&
     (!state.measurement.active || state.lastIncomingTime >= state.measurement.startTime))
 }
 
@@ -701,7 +689,7 @@ function recordMeasurementSample(value) {
   if (!state.measurement.active) {
     return
   }
-  state.measurement.samples.push(value)
+  if (state.measurement.samples.length < BUFFER_SIZE) state.measurement.samples.push(value)
 }
 
 function finalizeMeasurement() {
@@ -712,7 +700,11 @@ function finalizeMeasurement() {
   state.measurement.revealed = true
   setMeasurementIdle()
   window.NeuroFrontI18n.setText(refs.measurementState, "Measurement complete")
-  const samples = state.measurement.samples.slice()
+  const enoughSignal = state.measurement.samples.length >= BUFFER_SIZE * .9 &&
+    state.signalInput.valid - state.measurement.initialNotifications >= BUFFER_SIZE * .8 &&
+    state.signalInput.lastPacketValid !== false && performance.now() - state.lastIncomingTime < 250 &&
+    isDeviceConnected() && !document.hidden
+  const samples = enoughSignal ? state.measurement.samples.slice() : []
   state.flow = samples.length ? "complete" : "ready"
   state.exportSnapshot.buffer = samples.slice()
   const bounds = samples.length ? signalBounds(samples) : { min: -20, max: 20 }
@@ -721,7 +713,9 @@ function finalizeMeasurement() {
   if (!samples.length) {
     state.measurement.completed = false
     state.measurement.revealed = false
-    window.NeuroFrontI18n.setText(refs.measurementState, "No live signal detected")
+    const partial = state.measurement.samples.length > 0
+    state.measurement.samples = []
+    window.NeuroFrontI18n.setText(refs.measurementState, partial ? "Insufficient valid signal. No session estimate was produced." : "No live signal detected")
     resetLiveSessionState()
     updateControlsAvailability(performance.now())
     return
@@ -780,7 +774,7 @@ function measureAgain() {
   state.flow = "baseline"
   state.selectedBaselineKey = ""
   state.calibration.holdTimer = true
-  window.NeuroFrontI18n.setText(refs.baselineActionStatus, "Choose Recalibrate or Use Saved Baseline before measuring.")
+  window.NeuroFrontI18n.setText(refs.baselineActionStatus, "")
   setBaselineTimer(MEASUREMENT_MS / 1000, 0, "Measurement Window", "Choose a baseline")
   updateControlsAvailability(performance.now())
 }
@@ -803,6 +797,8 @@ function startMeasurement() {
   state.measurement.revealed = true
   state.measurement.startTime = performance.now()
   state.measurement.startedAt = new Date().toISOString()
+  state.measurement.initialNotifications = state.signalInput.valid
+  state.sampleAccumulator = 0
   state.measurement.id = window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
   state.measurement.baseline = { ...state.baseline, samples: state.baseline.samples.slice() }
   state.calibration.holdTimer = false
@@ -1002,12 +998,11 @@ function updateChartState(now) {
 
 function updateControlsAvailability(now) {
   syncBaselinePicker()
-  refs.baselineChoices.hidden = state.flow !== "baseline"
+  refs.baselineChoices.hidden = state.measurement.active || state.calibration.active || state.flow === "complete"
   refs.calibrationProgressButton.hidden = state.flow !== "calibrating"
   refs.measureButton.hidden = state.flow !== "ready" && state.flow !== "measuring"
   refs.completedActions.hidden = state.flow !== "complete"
-  refs.recalibrateButton.disabled = !isDeviceConnected() || !state.characteristic || state.measurement.active || state.calibration.active
-  refs.savedBaselineButton.disabled = !state.savedBaseline || !isDeviceConnected() || !state.characteristic || state.measurement.active || state.calibration.active
+  refs.recalibrateButton.disabled = Boolean(window.NeuroFrontAdaptive?.busy()) || !isDeviceConnected() || !state.characteristic || state.measurement.active || state.calibration.active
   refs.cancelCalibrationButton.hidden = !state.calibration.active
   refs.measureButton.disabled = state.measurement.active || !canStartMeasurement()
   refs.beginMeasurementButton.disabled = !canStartMeasurement()
@@ -1042,7 +1037,7 @@ function animationLoop(now) {
   }
   const delta = now - state.lastFrame
   state.lastFrame = now
-  state.sampleAccumulator += delta
+  state.sampleAccumulator = Math.min(state.sampleAccumulator + Math.max(0, delta), SAMPLE_INTERVAL * 4)
 
   while (state.sampleAccumulator >= SAMPLE_INTERVAL) {
     const bluetoothValue = nextBluetoothValue(now)
@@ -1064,7 +1059,8 @@ function animationLoop(now) {
   updateChartState(now)
   updateControlsAvailability(now)
   updateMeasurement(now)
-  updateChart()
+  window.NeuroFrontAdaptive?.tick(now)
+  if (!window.NeuroFrontAdaptive?.selected()) updateChart()
   requestAnimationFrame(animationLoop)
 }
 
@@ -1169,7 +1165,12 @@ function exportChartAsPng() {
   link.click()
 }
 
-function handleDisconnect() {
+let connectionEpoch = 0
+
+function handleDisconnect(event) {
+  if (event?.target && event.target !== state.device) return
+  connectionEpoch++
+  window.NeuroFrontAdaptive?.cancel("lost")
   if (state.calibration.active) cancelCalibration("Calibration interrupted. Your previous baseline is unchanged.")
   if (state.flow !== "complete" && state.flow !== "ready") state.flow = "baseline"
   if (refs.measurementDialog.open) refs.measurementDialog.close("disconnected")
@@ -1191,6 +1192,7 @@ function handleDisconnect() {
   state.measurement.active = false
   window.NeuroFrontAccount?.deviceBusy()
   if (!hasCompletedPreview) {
+    state.measurement.samples = []
     state.exportSnapshot.buffer = []
     state.exportSnapshot.axisMin = -20
     state.exportSnapshot.axisMax = 20
@@ -1214,16 +1216,21 @@ function handleDisconnect() {
 }
 
 function handleCharacteristic(event) {
+  if (event.target !== state.characteristic) return
   const raw = new TextDecoder().decode(event.target.value).replace(/\0/g, "").trim()
   const parts = raw.split(",")
   const valueText = parts[0] ?? ""
-  const parsedValue = Number.parseFloat(valueText)
+  const numeric = valueText.trim()
+  const parsedValue = /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[-+]?\d+)?$/i.test(numeric) ? Number(numeric) : NaN
   const now = performance.now()
   const input = state.signalInput
   input.received += 1
   input.lastPacket = JSON.stringify(raw.slice(0, 120))
   input.lastPacketValid = Number.isFinite(parsedValue)
-  if (!input.lastPacketValid) return
+  if (!input.lastPacketValid) {
+    window.NeuroFrontAdaptive?.cancel("invalid")
+    return
+  }
   if (!input.valid || parsedValue !== state.bluetoothValue) {
     input.unchangedSince = now
     input.unchangedCount = 0
@@ -1234,6 +1241,7 @@ function handleCharacteristic(event) {
   if (input.values.length > 100) input.values.shift()
   state.lastIncomingTime = now
   state.bluetoothValue = parsedValue
+  window.NeuroFrontAdaptive?.sample(parsedValue, now, valueText)
   captureBaselineSample(parsedValue)
   state.leadOff = false
   setStatus("connected")
@@ -1255,11 +1263,21 @@ async function startNotifications(characteristic) {
   throw lastError
 }
 
+function handleDisconnectForReconnect() {
+  const device = state.device
+  handleDisconnect()
+  if (device?.gatt?.connected) device.gatt.disconnect()
+}
+
 async function connectBluetooth() {
+  if (refs.connectButton.disabled) return
+  window.NeuroFrontAdaptive?.cancel("lost")
+  if (isDeviceConnected() && (state.calibration.active || state.measurement.active)) handleDisconnectForReconnect()
   if (!navigator.bluetooth) {
     setStatus("disconnected")
     return
   }
+  const attempt = ++connectionEpoch
   refs.connectButton.disabled = true
   state.lastIncomingTime = 0
   state.signalInput = { received: 0, valid: 0, lastPacket: "", lastPacketValid: null, values: [], unchangedSince: 0, unchangedCount: 0 }
@@ -1281,24 +1299,28 @@ async function connectBluetooth() {
       filters: [{ name: DEVICE_NAME }, { namePrefix: DEVICE_NAME }],
       optionalServices: [SERVICE_UUID]
     })
+    if (attempt !== connectionEpoch) return
     if (!device.gatt) {
       throw new Error("GATT unavailable")
     }
     state.device = device
     device.addEventListener("gattserverdisconnected", handleDisconnect)
     const server = device.gatt.connected ? device.gatt : await device.gatt.connect()
+    if (attempt !== connectionEpoch || device !== state.device) return
     window.NeuroFrontI18n.setText(refs.connectButton, "Reconnect")
     setStatus("connected")
     const service = await server.getPrimaryService(SERVICE_UUID)
     const characteristic = await service.getCharacteristic(CHAR_UUID)
+    if (attempt !== connectionEpoch || device !== state.device || !device.gatt.connected) return
     state.characteristic = characteristic
     characteristic.addEventListener("characteristicvaluechanged", handleCharacteristic)
     await startNotifications(characteristic)
+    if (attempt !== connectionEpoch) return
     if (canStartMeasurement()) {
       window.NeuroFrontI18n.setText(refs.measurementState, "Baseline ready. Start a measurement when you are ready.")
     }
   } catch (error) {
-    handleDisconnect()
+    if (attempt === connectionEpoch) handleDisconnectForReconnect()
   } finally {
     refs.connectButton.disabled = false
     updateControlsAvailability(performance.now())
@@ -1306,12 +1328,20 @@ async function connectBluetooth() {
 }
 
 function bindEvents() {
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) return
+    if (state.calibration.active) cancelCalibration()
+    if (state.measurement.active) {
+      state.measurement.samples = []
+      finalizeMeasurement()
+      window.NeuroFrontI18n.setMessage(refs.measurementState, "dash.visibility")
+    }
+  })
   document.addEventListener("neurofront:accountchange", updateAccountBaselineNotice)
   refs.connectButton.addEventListener("click", connectBluetooth)
   refs.measureAgainButton.addEventListener("click", measureAgain)
   refs.exportButton.addEventListener("click", exportChartAsPng)
   refs.recalibrateButton.addEventListener("click", startCalibration)
-  refs.savedBaselineButton.addEventListener("click", useSavedBaseline)
   refs.baselineSelect.addEventListener("change", () => {
     const selectedKey = refs.baselineSelect.value
     selectBaselineRecord(state.baselineOptions.get(selectedKey), selectedKey)
@@ -1341,7 +1371,7 @@ function init() {
 }
 
 window.NeuroFrontDevice = Object.freeze({
-  busy: () => state.calibration.active || state.measurement.active,
+  busy: () => state.calibration.active || state.measurement.active || Boolean(window.NeuroFrontAdaptive?.busy()),
   validBaseline: validateSavedBaseline,
   loadGuestBaseline: loadSavedBaseline,
   setSavedBaseline(record, accountBaselines = []) {
@@ -1360,7 +1390,8 @@ window.NeuroFrontDevice = Object.freeze({
   },
   resetForAccount() {
     baselineSaveNotice = null
-    const interrupted = state.measurement.active || state.calibration.active
+    const interrupted = state.measurement.active || state.calibration.active || Boolean(window.NeuroFrontAdaptive?.busy())
+    window.NeuroFrontAdaptive?.reset()
     if (refs.measurementDialog.open) refs.measurementDialog.close("account-changed")
     state.calibration = { active: false, startTime: 0, samples: [], holdTimer: true }
     state.measurement = { active: false, startTime: 0, samples: [], completed: false, revealed: false }

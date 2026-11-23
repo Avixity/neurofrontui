@@ -33,6 +33,13 @@
         </button>
         <ul class="language-menu" id="languageMenu" role="listbox" aria-label="Language" hidden></ul>
       </div>
+      <label class="mode-picker status-pill">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="5"/><path d="M6 12h3l2-4 2.5 8 2-4H18"/></svg>
+        <select id="modeSelect" aria-label="Measurement mode" data-i18n-aria-label="dash.mode">
+          <option value="standard" data-i18n="dash.standard">Standard</option>
+          <option value="adaptive" data-i18n="dash.adaptive">Adaptive</option>
+        </select>
+      </label>
       <div class="account-connection-group">
       <div class="status-pill" id="statusPill" data-state="disconnected">
         <span class="status-dot"></span>
@@ -48,7 +55,18 @@
     </div>
   </header>
 
-  <main class="dashboard">
+  <nav class="dashboard-dock" data-i18n-aria-label="dash.dock" aria-label="Dashboard navigation">
+    <a href="#measurementArea"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13h5l3-8 4 14 3-7h5"/></svg><span data-i18n="dash.measurement">Measurement</span></a>
+    <a href="#summaryTitle"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M7 16v-3m5 3V7m5 9v-6"/></svg><span data-i18n="dash.data">Data</span></a>
+    <div class="assistant-launch-area" id="assistantLaunchArea">
+  <p class="assistant-callout" id="assistantCallout" role="status" data-i18n="assistant.callout">I can help explain your readings, baselines and NeuroFront setup.</p>
+  <button class="assistant-launcher" id="assistantLauncher" type="button" aria-expanded="false" aria-controls="assistantPanel" aria-haspopup="dialog" aria-label="Open NeuroFront AI" data-i18n-aria-label="assistant.open">
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8 8 0 0 1-8 8H8l-4 2v-5a8 8 0 1 1 17-5z"/><path d="M8 10h8m-8 4h5"/></svg>
+    <span id="assistantLauncherLabel">NeuroFront AI</span>
+  </button>
+</div>
+  </nav>
+  <main class="dashboard" id="measurementArea" tabindex="-1">
       <section class="panel chart-panel">
         <div class="panel-head">
           <div>
@@ -82,6 +100,26 @@
         </div>
       </section>
 
+      <section class="panel adaptive-panel" id="adaptivePanel" hidden aria-labelledby="adaptiveTitle">
+        <div class="adaptive-heading">
+          <p class="eyebrow" data-i18n="dash.mode">Measurement mode</p>
+          <h2 id="adaptiveTitle" data-i18n="dash.session">Adaptive session</h2>
+        </div>
+        <div class="adaptive-clock">
+          <span class="eyebrow" data-i18n="dash.elapsed">Elapsed time</span>
+          <strong id="adaptiveTime" role="timer" aria-live="off">00:00</strong>
+          <p id="adaptiveStatus" role="status" data-i18n="dash.missing">Select a baseline and connect with a fresh signal to start.</p>
+        </div>
+        <div class="adaptive-actions">
+          <label><span data-i18n="dash.duration">Session length</span>
+            <select id="adaptiveDuration"><option value="5" data-i18n="dash.five">5 minutes</option><option value="10" data-i18n="dash.ten">10 minutes</option></select>
+          </label>
+          <button type="button" id="adaptiveStart" class="action-button accent" disabled data-i18n="dash.start">Start session</button>
+          <button type="button" id="adaptiveStop" class="action-button ghost" hidden data-i18n="dash.stop">Stop session</button>
+        </div>
+        <p class="control-note" id="adaptiveCoverage" hidden></p>
+        <p class="control-note" data-i18n="dash.privacy">Recorded session estimate only. Not a medical assessment. Adaptive results stay on this screen and are not added to capture history.</p>
+      </section>
       <section class="panel metric-panel">
         <div class="metric-card emphasis">
           <span class="metric-label" data-i18n="signal.level">Signal Level</span>
@@ -128,14 +166,19 @@
             <span data-i18n="stress.relaxed">Relaxed</span>
             <span data-i18n="stress.high">High</span>
           </div>
-          <strong class="stress-label" id="stressLabel" data-i18n="baseline">Baseline</strong>
-          <p class="metric-detail" id="stressFeedback" data-i18n="baseline.prepare">Connect and sit relaxed for 20 seconds to calibrate your session baseline.</p>
-          <p class="baseline-note" id="baselineNote" data-i18n="baseline.noneSelected">No baseline selected</p>
+          <strong hidden class="stress-label" id="stressLabel" data-i18n="baseline">Baseline</strong>
+          <p hidden class="metric-detail" id="stressFeedback" data-i18n="baseline.prepare">Connect and sit relaxed for 20 seconds to calibrate your session baseline.</p>
+          <p class="baseline-note" id="baselineNote" data-i18n="dash.reference">Resting reference: 50/100</p>
           <div class="stress-baseline-picker">
             <label for="baselineSelect" class="metric-label" data-i18n="baseline.chooseTitle">Choose a baseline</label>
             <select id="baselineSelect" aria-describedby="baselineNote" disabled>
               <option id="baselinePlaceholder" value="" data-i18n="baseline.noSaved">No saved baseline yet.</option>
             </select>
+            <div class="baseline-buttons" id="baselineChoices">
+              <button id="recalibrateButton" class="action-button ghost compact-button" disabled data-i18n="baseline.recalibrate">Recalibrate</button>
+            </div>
+            <button id="cancelCalibrationButton" class="text-button" hidden data-i18n="baseline.cancel">Cancel calibration</button>
+            <p class="control-note control-status" id="baselineActionStatus" role="status" aria-live="polite"></p>
           </div>
           <button class="text-button assistant-explain" id="getMeasurementExplanation" type="button" hidden aria-controls="assistantPanel" data-i18n="assistant.getMore">Get to know more</button>
         </div>
@@ -146,10 +189,6 @@
         <div class="button-group">
           <button id="connectButton" class="action-button primary" data-i18n="device.connect">Connect</button>
           <div class="session-action-area">
-            <div class="baseline-buttons" id="baselineChoices">
-              <button id="recalibrateButton" class="action-button ghost" disabled data-i18n="baseline.recalibrate">Recalibrate</button>
-              <button id="savedBaselineButton" class="action-button ghost" disabled data-i18n="baseline.useSaved">Use Saved Baseline</button>
-            </div>
             <button id="calibrationProgressButton" class="action-button accent" disabled hidden data-i18n="baseline.progressButton">Calibrating…</button>
             <button id="measureButton" class="action-button accent" disabled hidden aria-haspopup="dialog" aria-controls="setupImageDialog" data-i18n="measurement.start">Start Measurement</button>
             <div class="measurement-buttons" id="completedActions" hidden>
@@ -157,10 +196,7 @@
               <button id="exportButton" class="action-button ghost" data-i18n="export.png">Export PNG</button>
             </div>
           </div>
-          <p class="control-note" id="savedBaselineInfo" data-i18n="baseline.noSaved">No saved baseline yet.</p>
-          <button id="cancelCalibrationButton" class="text-button" hidden data-i18n="baseline.cancel">Cancel calibration</button>
         </div>
-        <p class="control-note control-status" id="baselineActionStatus" role="status" aria-live="polite"></p>
       </section>
     </div>
     <section class="panel timer-panel">
@@ -186,7 +222,7 @@
         <div class="panel-head compact">
           <div>
             <p class="eyebrow" data-i18n="session.summary">Session Summary</p>
-            <h2 id="summaryTitle" data-i18n="session.results">Capture Results</h2>
+            <h2 tabindex="-1" id="summaryTitle" data-i18n="session.results">Capture Results</h2>
           </div>
           <div class="activity-badge" id="activityLabel" data-i18n="activity.stable">Stable</div>
         </div>
@@ -397,13 +433,6 @@
     </div>
   </form>
 </section>
-<div class="assistant-launch-area" id="assistantLaunchArea">
-  <p class="assistant-callout" id="assistantCallout" role="status" data-i18n="assistant.callout">I can help explain your readings, baselines and NeuroFront setup.</p>
-  <button class="assistant-launcher" id="assistantLauncher" type="button" aria-expanded="false" aria-controls="assistantPanel" aria-haspopup="dialog" aria-label="Open NeuroFront AI" data-i18n-aria-label="assistant.open">
-    <img src="assistant-avatar.webp?v=guide-2" width="52" height="52" alt="">
-  </button>
-  <span class="assistant-launcher-label" id="assistantLauncherLabel">NeuroFront AI</span>
-</div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="language-data.js" defer></script>
@@ -411,9 +440,11 @@
 <script src="resource-data.js" defer></script>
 <script src="assistant-language.js" defer></script>
 <script src="account-language.js" defer></script>
+<script src="dashboard-language.js" defer></script>
 <script src="language.js" defer></script>
 <script src="score-config.js" defer></script>
 <script src="app.js" defer></script>
+<script src="dashboard-session.js" defer></script>
 <script src="setup-viewer.js" defer></script>
 <script src="capture-history.js" defer></script>
 <script src="resources.js" defer></script>
