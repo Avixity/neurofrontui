@@ -60,7 +60,7 @@ const url = process.env.NEUROFRONT_URL || 'http://127.0.0.1:5180'
       }
     }, first)
     await page.locator('#measureAgainButton').click()
-    await page.locator('#savedBaselineButton').click()
+    await page.locator('#baselineSelect').selectOption('saved')
     await begin()
     const latest = await finish()
     await page.locator('#getMeasurementExplanation').click()
@@ -103,7 +103,7 @@ const url = process.env.NEUROFRONT_URL || 'http://127.0.0.1:5180'
     assert.equal(requests.at(-1).context.selected.baseline.createdAt, first.baseline.createdAt)
     // Chat stays independent from the actual acquisition state and sample buffer.
     await page.locator('#assistantClose').click()
-    await page.locator('#measureAgainButton').click(); await page.locator('#savedBaselineButton').click(); await begin()
+    await page.locator('#measureAgainButton').click(); await page.locator('#baselineSelect').selectOption('saved'); await begin()
     const active = await page.evaluate(() => ({ start: state.measurement.startTime, id: state.measurement.id, baseline: JSON.stringify(state.measurement.baseline), calls: { ...sim.calls } }))
     await page.locator('#assistantLauncher').click()
     await page.locator('#assistantInput').fill('Why might a trace be noisy?')

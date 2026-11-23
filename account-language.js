@@ -2,6 +2,13 @@
   "use strict"
   const groups = [
     {
+      keys: ["manageBaseline", "chooseManagedBaseline", "baselineName", "renameBaseline", "removeBaseline", "confirmRemoveBaseline", "guestBaseline", "guestBaselineHelp", "guestBaselineRenamed", "guestBaselineRemoved", "error.baselineName", "error.baselineCapacity"],
+      values: {
+        en: ["Manage a saved baseline", "Choose a saved baseline", "Baseline name (up to 48 characters)", "Rename", "Remove saved baseline", "Remove this saved baseline from future use? Existing captures keep the reference they used.", "Guest baseline on this device", "Guest baselines are stored in this browser, not in your account.", "Guest baseline renamed on this device.", "Guest baseline removed from this device.", "Enter a baseline name of 1 to 48 characters.", "Baseline changes could not be saved because account preferences are full."],
+        hi: ["सहेजी गई आधार रेखा प्रबंधित करें", "सहेजी गई आधार रेखा चुनें", "आधार रेखा का नाम (48 वर्ण तक)", "नाम बदलें", "सहेजी गई आधार रेखा हटाएँ", "भविष्य के उपयोग से यह आधार रेखा हटाएँ? पुराने रिकॉर्ड में उनकी मूल आधार रेखा रहेगी।", "इस डिवाइस पर अतिथि आधार रेखा", "अतिथि आधार रेखाएँ इस ब्राउज़र में सहेजी जाती हैं, आपके खाते में नहीं।", "इस डिवाइस पर अतिथि आधार रेखा का नाम बदल गया।", "इस डिवाइस से अतिथि आधार रेखा हटा दी गई।", "आधार रेखा के लिए 1 से 48 वर्णों का नाम दर्ज करें।", "खाता सेटिंग्स में जगह नहीं है, इसलिए बदलाव सहेजे नहीं गए।"]
+      }
+    },
+    {
       keys: ["title", "profile", "authentication", "signIn", "signUp", "signOut", "guest", "email", "password", "confirmPassword", "displayName", "displayNameOptional", "forgot", "back", "showPassword", "hidePassword", "sendRecovery", "newPassword", "updatePassword", "changePhoto", "expandResources", "baselines", "activeBaseline", "cloudData", "reload", "conversations", "guestData", "working", "loading", "saved", "syncReady", "conflictShort", "noBaseline", "dateUnknown"],
       values: {
         en: ["Account", "Profile", "Account access", "Sign In", "Sign Up", "Sign Out", "Continue as Guest", "Email", "Password", "Confirm password", "Display name", "Display name (optional)", "Forgot password?", "Back to sign in", "Show", "Hide", "Send recovery email", "New password", "Update password", "Change photo", "Keep Educational Resources expanded", "Saved baselines", "Active baseline", "Cloud data", "Load latest account data", "Saved conversations", "Guest data on this device", "Please wait…", "Loading account data…", "Saved", "Account connected", "Newer changes available", "No active baseline", "Date unavailable"],
