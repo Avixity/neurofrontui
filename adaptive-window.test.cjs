@@ -7,7 +7,7 @@ const source = fs.readFileSync(__dirname + "/dashboard-session.js", "utf8")
 function fixture() {
   const controls = new Map(), events = new Map(), calls = []
   const baseline = { createdAt: "synthetic", ready: true, mean: 0, rms: 2, stdDev: 2, peakToPeak: 4, derivativeMean: 1 }
-  let now = 2000, owner = "test-owner", connected = true
+  let now = 2000, wall = 1234567890000, owner = "test-owner", connected = true
   const document = { hidden: false, body: { classList: { toggle() {}, remove() {} } },
     addEventListener(key, cb) { events.set(key,cb) }, getElementById(id) {
       if (!controls.has(id)) controls.set(id, { value: "", hidden: false, disabled: false, focus() {},
@@ -20,7 +20,7 @@ function fixture() {
     NeuroFrontI18n: { setText(el, value) { el.textContent = value }, setMessage(el, key, details) {
       el.textContent = key; el.values = details
     } } }
-  const ctx = vm.createContext({ document, window, state, MEASUREMENT_MS:15000, SAMPLE_INTERVAL:50, performance:{ now:() => now },
+  const ctx = vm.createContext({ document, window, state, Date:{now:()=>wall}, MEASUREMENT_MS:15000, SAMPLE_INTERVAL:50, performance:{ now:() => now },
     isDeviceConnected:() => connected, refs:{ measurementDialog:{ open:false } }, hasFreshBluetoothSignal:() => true,
     updateControlsAvailability() {}, estimateWindowScore(values, reference) {
       calls.push({ length:values.length, ref:reference.peakToPeak })
@@ -40,7 +40,7 @@ function fixture() {
     else { state.lastIncomingTime = now; api.sample(value, now, String(value)) }
   }
   return { start, at, el, api, state, calls, document, events,
-    switchUser(){owner = "other"}, disconnect(){connected = false} }
+    sleep(){wall += 300000}, switchUser(){owner = "other"}, disconnect(){connected = false} }
 }
 test("10-minute estimate averages forty original-model calls and retains at most one 300-slot window", () => {
   const f = fixture(); const start = f.start(10)
@@ -57,13 +57,14 @@ test("10-minute estimate averages forty original-model calls and retains at most
   assert.equal(f.el("adaptiveTime").textContent,"10:00")
 })
 test("sparse, flat, stale, stopped, and account-switched inputs never yield an estimate", () => {
-  for (const kind of ["sparse","flat","stale","stop","owner","reset","disconnect","hidden","malformed"]) {
+  for (const kind of ["sparse","flat","stale","sleep","stop","owner","reset","disconnect","hidden","malformed"]) {
     const f=fixture(), start=f.start()
     if (kind==="sparse" || kind==="flat") {
       const stride=kind==="sparse"?200:50
       for(let t=0;t<15000;t+=stride) f.at(start+t,kind==="flat"?1:Math.sin(t))
       f.at(start+15000)
     } else if(kind==="stale") f.at(start+1001)
+    else if(kind==="sleep"){f.sleep(); f.at(start+5,1)}
     else if(kind==="stop") f.el("adaptiveStop").click()
     else if(kind==="owner"){f.switchUser();f.at(start+100)}
     else if(kind==="reset")f.api.reset()

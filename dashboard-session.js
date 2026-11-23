@@ -71,7 +71,7 @@
     elapsed = 0
     message = ""
     run = { start: now, duration: minutes * 60000, owner: owner(), baseline, reference: state.baseline.createdAt,
-      characteristic: state.characteristic, lastPacket: now, index: 0, values: new Array(slots), total: 0, count: 0, first: null, last: null }
+      characteristic: state.characteristic, lastPacket: now, lastPacketWall: Date.now(), index: 0, values: new Array(slots), total: 0, count: 0, first: null, last: null }
     window.NeuroFrontAccount?.deviceBusy()
     updateControlsAvailability(now)
     render(now)
@@ -81,7 +81,8 @@
     if (!run) return false
     if (owner() !== run.owner || !state.baseline.ready || state.baseline.createdAt !== run.reference) { cancel("changed"); return false }
     if (document.hidden) { cancel("visibility"); return false }
-    if (!isDeviceConnected() || !state.characteristic || state.characteristic !== run.characteristic || now < run.start ||
+    const wallGap = Date.now() - run.lastPacketWall
+    if (wallGap < 0 || wallGap > maxGapMs || !isDeviceConnected() || !state.characteristic || state.characteristic !== run.characteristic || now < run.start ||
         now - run.lastPacket > maxGapMs) { cancel("lost"); return false }
     return true
   }
@@ -123,6 +124,7 @@
     if (!advance(now)) return
     const inside = now - run.start - run.index * windowMs
     run.lastPacket = now
+    run.lastPacketWall = Date.now()
     run.values[Math.min(slots - 1, Math.floor(inside / slotMs))] = value
     if (run.first === null) run.first = inside
     run.last = inside
