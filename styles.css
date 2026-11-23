@@ -1607,3 +1607,14 @@ html[lang="ur"] .assistant-messages, html[lang="ur"] .assistant-context, html[la
   .dashboard-dock,.connection-controls :is(.status-pill,.profile-button) { border:1px solid ButtonText; background:Canvas; color:CanvasText; }
   .dashboard-dock svg,.mode-picker svg { color:ButtonText; }
 }
+
+.metric-card.stress-card > .stress-baseline-picker { grid-column:1 / -1; width:100%; justify-self:stretch; }
+.mode-adaptive .metric-card.stress-card { display:flex; flex-direction:column; align-items:stretch; gap:12px; }
+.mode-adaptive .stress-card > .baseline-note { order:2; align-self:flex-start; text-align:start; }
+@media(max-width:860px) {
+  .metric-card.stress-card { grid-column:1 / -1; grid-template-columns:minmax(0,1fr); }
+  .metric-card.stress-card > :is(.baseline-note,.stress-label) { grid-column:1; grid-row:auto; text-align:start; }
+}
+
+.topbar:has(.language-menu:not([hidden])) { position:relative; z-index:32; }
+@media(max-width:1000px) { .dashboard-dock { z-index:auto; } }

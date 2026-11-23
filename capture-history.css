@@ -1,13 +1,34 @@
 .history-open { margin-top: 8px; }
 .history-date-groups { display: grid; gap: 18px; }
 .history-date-group h3 { margin: 0 0 8px; font-size: 0.95rem; }
-.stress-summary { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
-.stress-summary h3 { margin: 0; font-size: 1rem; }
-.stress-summary .control-note { margin-top: 6px; }
-.stress-summary details { margin-top: 8px; }
-.stress-summary summary { cursor: pointer; width: fit-content; }
-.stress-summary summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.stress-summary-days { display: grid; gap: 8px; list-style: none; padding: 0; margin: 10px 0 0; }
-.stress-summary-days li { display: grid; grid-template-columns: minmax(0, 1fr) 4ch minmax(7ch, auto); gap: 6px 10px; align-items: center; font-size: 0.8rem; }
-.stress-summary-days meter { width: 100%; accent-color: var(--accent); }
-@media (max-width: 560px) { .stress-summary-days li { grid-template-columns: minmax(0, 1fr) auto; } .stress-summary-days meter { grid-column: 1/-1; grid-row: 2; } }
+.stress-summary-launch { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.stress-summary-launch h3 { margin: 0 0 3px; font-size: 0.95rem; }
+.stress-summary-dialog { --calendar-empty: #242b38; --calendar-l1: #1c3f43; --calendar-l2: #1d5f65; --calendar-l3: #188284; --calendar-l4: #57d5c3; }
+.stress-summary-dialog .setup-dialog-head { align-items: start; }
+.stress-calendar-navigation { display: flex; align-items: center; gap: 10px; }
+.stress-calendar-navigation h3 { flex: 1; margin: 0; text-align: center; font-size: 1rem; }
+.stress-calendar-navigation button { min-width: 44px; min-height: 44px; margin: 0; font-size: 1.1rem; }
+.stress-summary-dialog #stressSummaryStatus { margin: 10px 0 14px; }
+.stress-summary-layout { display: grid; grid-template-columns: minmax(0, 1.38fr) minmax(0, 1fr); gap: 20px; }
+.stress-calendar { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 3px; }
+.stress-calendar th { color: var(--muted); font-size: 0.73rem; padding: 0 0 4px; font-weight: 500; text-align: center; }
+.stress-calendar td { padding: 0; }
+.stress-calendar-day { display: grid; place-items: center; background: var(--tile); color: #fff; border: 1px solid transparent; width: 100%; min-height: 31px; border-radius: 5px; font: 600 0.85rem Inter, system-ui, sans-serif; cursor: pointer; }
+.stress-calendar-day[aria-pressed="true"] { border-color: #ecffff; }
+.stress-calendar-day[aria-current="date"] { text-decoration: underline; text-underline-offset: 3px; }
+.stress-calendar-day:disabled { cursor: default; color: #a7b5c5; opacity: 0.58; }
+.stress-summary-dialog [data-level="empty"] { --tile: var(--calendar-empty); }
+.stress-summary-dialog [data-level="1"] { --tile: var(--calendar-l1); }
+.stress-summary-dialog [data-level="2"] { --tile: var(--calendar-l2); }
+.stress-summary-dialog [data-level="3"] { --tile: var(--calendar-l3); color: #fff; background: #177275; }
+.stress-summary-dialog [data-level="4"] { --tile: var(--calendar-l4); color: #071e20; }
+.stress-calendar-legend { list-style: none; padding: 0; margin: 12px 3px 0; display: flex; flex-wrap: wrap; gap: 7px 9px; color: var(--muted); font-size: 0.72rem; }
+.stress-calendar-legend li { display: flex; align-items: center; gap: 4px; }
+.stress-calendar-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 2px; background: var(--tile); }
+.stress-summary-facts { display: grid; gap: 12px; align-content: start; }
+.stress-summary-facts section { background: rgba(10, 16, 25, 0.72); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; }
+.stress-summary-facts h3 { font-size: 0.9rem; margin: 0 0 7px; }
+.stress-time-bins { display: grid; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.stress-time-bins li { display: grid; gap: 2px; border-top: 1px solid var(--border); padding-top: 6px; font-size: 0.76rem; }
+.stress-time-bins li span { color: var(--muted); }
+@media (max-width: 640px) { .stress-summary-layout { grid-template-columns: minmax(0, 1fr); gap: 15px; } }

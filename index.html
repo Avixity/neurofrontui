@@ -243,6 +243,13 @@
           </div>
           </div>
         </div>
+        <div class="stress-summary-launch">
+          <div>
+            <h3 data-i18n="history.stressSummary">Stress Summary</h3>
+            <p class="control-note" data-i18n="history.calendarTeaser">Explore the scores from your saved captures.</p>
+          </div>
+          <button class="action-button ghost compact-button" id="stressSummaryOpen" type="button" aria-haspopup="dialog" aria-controls="stressSummaryDialog" data-i18n="history.calendarOpen">View summary</button>
+        </div>
       </section>
       <section class="panel history-panel" aria-labelledby="historyTitle">
         <div class="panel-head compact">
@@ -259,15 +266,7 @@
         </div>
         <button class="action-button ghost compact-button history-open" id="historyOpen" type="button" aria-haspopup="dialog" aria-controls="historyDialog" hidden data-i18n="history.open">View history</button>
         <p class="history-storage-note control-note" data-i18n="history.storageNote">Captures stay in this browser on this device.</p>
-        <div class="stress-summary" aria-labelledby="stressSummaryTitle">
-          <h3 id="stressSummaryTitle" data-i18n="history.stressSummary">Stress Summary</h3>
-          <p class="section-caption" id="stressSummaryStatus"></p>
-          <p class="control-note" id="stressSummaryTrend" hidden></p>
-          <details id="stressSummaryDetails" hidden>
-            <summary data-i18n="history.dailyScores">Daily averages</summary>
-            <ul id="stressSummaryDays" class="stress-summary-days"></ul>
-          </details>
-        </div>
+
       </section>
     </div>
     <section class="panel resources-panel" id="resourcesPanel" aria-labelledby="resourcesTitle">
@@ -313,6 +312,47 @@
   <div class="setup-dialog-actions">
     <button class="action-button ghost" id="cancelMeasurementButton" type="button" data-i18n="common.cancel">Cancel</button>
     <button class="action-button accent" id="beginMeasurementButton" type="button" data-i18n="measurement.begin">Begin Measurement</button>
+  </div>
+</dialog>
+
+<dialog class="content-dialog stress-summary-dialog" id="stressSummaryDialog" aria-labelledby="stressSummaryTitle" aria-describedby="stressSummaryNote">
+  <div class="setup-dialog-head">
+    <div>
+      <h2 id="stressSummaryTitle" data-i18n="history.stressSummary">Stress Summary</h2>
+      <p class="section-caption" id="stressSummaryNote" data-i18n="history.calendarNote">Scores are from saved captures only, not continuous stress readings. Times are local.</p>
+    </div>
+    <button class="action-button ghost compact-button" id="stressSummaryClose" type="button" data-i18n="common.close">Close</button>
+  </div>
+  <div class="stress-calendar-navigation">
+    <button class="action-button ghost compact-button" id="stressSummaryPrevious" type="button" aria-label="Previous month" data-i18n-aria-label="history.calendarPrevious"><span aria-hidden="true">←</span></button>
+    <h3 id="stressSummaryMonth" aria-live="polite"></h3>
+    <button class="action-button ghost compact-button" id="stressSummaryNext" type="button" aria-label="Next month" data-i18n-aria-label="history.calendarNext"><span aria-hidden="true">→</span></button>
+  </div>
+  <p class="control-note" id="stressSummaryStatus" role="status"></p>
+  <div class="stress-summary-layout">
+    <div>
+      <table class="stress-calendar" aria-labelledby="stressSummaryMonth">
+        <thead><tr id="stressSummaryWeekdays"></tr></thead>
+        <tbody id="stressSummaryDays"></tbody>
+      </table>
+      <ul class="stress-calendar-legend" aria-label="Daily average score legend" data-i18n-aria-label="history.calendarLegend">
+        <li><i data-level="empty" aria-hidden="true"></i><span data-i18n="history.calendarNoCapture">No capture</span></li>
+        <li><i data-level="1" aria-hidden="true"></i>0–24</li>
+        <li><i data-level="2" aria-hidden="true"></i>25–49</li>
+        <li><i data-level="3" aria-hidden="true"></i>50–74</li>
+        <li><i data-level="4" aria-hidden="true"></i>75–100</li>
+      </ul>
+    </div>
+    <div class="stress-summary-facts">
+      <section aria-labelledby="stressSummaryDay">
+        <h3 id="stressSummaryDay"></h3>
+        <p class="control-note" id="stressSummaryDayDetails" aria-live="polite"></p>
+      </section>
+      <section aria-labelledby="stressSummaryTimesTitle">
+        <h3 id="stressSummaryTimesTitle" data-i18n="history.calendarTimes">Time of day · this month</h3>
+        <ul class="stress-time-bins" id="stressSummaryTimes"></ul>
+      </section>
+    </div>
   </div>
 </dialog>
 

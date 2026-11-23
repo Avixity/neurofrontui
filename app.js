@@ -281,7 +281,7 @@ function refreshStressState(sampleWindow) {
     updateStressMeter(50, "Calibrating", feedback)
     return
   }
-  if (!state.baseline.ready || (state.flow === "baseline" && !state.measurement.completed)) {
+  if (!(state.measurement.completed && state.measurement.baseline) && (!state.baseline.ready || state.flow === "baseline")) {
     const feedback = isDeviceConnected()
       ? "Choose Recalibrate or Use Saved Baseline before measuring."
       : state.baselineOptions.size
@@ -396,7 +396,9 @@ function updateBaselinePicker() {
   }
   state.baselineOptions = options
   const locale = document.documentElement.lang
-  const signature = JSON.stringify([locale, [...options].map(([key, record]) => [key, record.createdAt])])
+  const accountLabels = new Map(state.accountBaselines.map(({ id, label }) => [id, label]))
+  const optionLabel = (key, record) => accountLabels.get(key) || (key === "saved" ? record.label || "" : "")
+  const signature = JSON.stringify([locale, [...options].map(([key, record]) => [key, record.createdAt, optionLabel(key, record)])])
   if (baselineOptionsSignature === signature) return
   baselineOptionsSignature = signature
   const formatter = new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" })
@@ -404,7 +406,9 @@ function updateBaselinePicker() {
   refs.baselineSelect.replaceChildren(refs.baselinePlaceholder, ...ordered.map(([key, record]) => {
     const option = document.createElement("option")
     option.value = key
-    option.textContent = formatter.format(new Date(record.createdAt))
+    const date = formatter.format(new Date(record.createdAt))
+    const label = optionLabel(key, record)
+    option.textContent = label ? label + " · " + date : date
     return option
   }))
   window.NeuroFrontI18n.setText(refs.baselinePlaceholder, ordered.length ? "Choose a baseline" : "No saved baseline yet.")
@@ -1226,7 +1230,7 @@ function handleCharacteristic(event) {
   const input = state.signalInput
   input.received += 1
   input.lastPacket = JSON.stringify(raw.slice(0, 120))
-  input.lastPacketValid = Number.isFinite(parsedValue)
+  input.lastPacketValid = Number.isFinite(parsedValue) && Number.isFinite(parsedValue ** 2 * BASELINE_SAMPLE_COUNT)
   if (!input.lastPacketValid) {
     window.NeuroFrontAdaptive?.cancel("invalid")
     return
@@ -1378,14 +1382,47 @@ window.NeuroFrontDevice = Object.freeze({
     state.savedBaseline = validateSavedBaseline(record) ? record : null
     state.accountBaselines = accountBaselines.filter(row => typeof row?.id === "string" && validateSavedBaseline(row.payload))
     const explicitBaseline = state.selectedBaselineKey && state.accountBaselines.find(row => row.id === state.selectedBaselineKey)
+    const removedSelection = state.selectedBaselineKey && state.selectedBaselineKey !== "saved" && !explicitBaseline
     if (!state.measurement.active && !state.calibration.active && state.baseline.ready &&
-        state.baseline.createdAt !== (explicitBaseline?.payload || state.savedBaseline)?.createdAt) {
+        (removedSelection || state.baseline.createdAt !== (explicitBaseline?.payload || state.savedBaseline)?.createdAt)) {
+      window.NeuroFrontAdaptive?.cancel("changed")
       state.selectedBaselineKey = ""
       state.baseline.ready = false
-      state.flow = "baseline"
+      if (state.flow !== "complete") state.flow = "baseline"
       window.NeuroFrontI18n.setMessage(refs.baselineActionStatus, "account.chooseBaseline")
     }
     updateSavedBaselineInfo()
+    updateControlsAvailability(performance.now())
+  },
+  guestBaseline() {
+    const record = !window.NeuroFrontAccount?.owner() && state.savedBaseline
+    return record ? { label: typeof record.label === "string" ? record.label : "", createdAt: record.createdAt } : null
+  },
+  changeGuestBaseline(createdAt, change) {
+    const fail = code => Object.assign(new Error(code), { code })
+    if (window.NeuroFrontAccount?.owner()) throw fail("authentication")
+    if (state.measurement.active || state.calibration.active || window.NeuroFrontAdaptive?.busy()) throw fail("activeCapture")
+    if (!state.savedBaseline || state.savedBaseline.createdAt !== createdAt) throw fail("baseline")
+    const label = typeof change?.label === "string" ? change.label.trim() : ""
+    if (change?.removed !== true && (!label || label.length > 48)) throw fail("baselineName")
+    try {
+      if (change?.removed === true) localStorage.removeItem(BASELINE_STORAGE_KEY)
+      else {
+        const record = { ...state.savedBaseline, label }
+        localStorage.setItem(BASELINE_STORAGE_KEY, JSON.stringify(record))
+        state.savedBaseline = record
+      }
+    } catch { throw fail("storage") }
+    if (change?.removed === true) {
+      state.savedBaseline = null
+      if (state.baseline.createdAt === createdAt) {
+        state.baseline.ready = false
+        state.selectedBaselineKey = ""
+        if (state.flow !== "complete") state.flow = "baseline"
+      }
+    }
+    updateSavedBaselineInfo()
+    refreshStressState(state.measurement.completed ? state.exportSnapshot.buffer : [])
     updateControlsAvailability(performance.now())
   },
   resetForAccount() {

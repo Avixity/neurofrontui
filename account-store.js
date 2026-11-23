@@ -15,9 +15,13 @@
   const empty = id => ({ owner: id, profile: null, baselines: [], captures: [], threads: [], outbox: [], deletedCaptures: [] })
   const fail = code => { const e = new Error(code); e.code = code; return e }
   const event = (name, detail) => document.dispatchEvent(new CustomEvent(name, { detail }))
+  const baselineMetadata = profile => profile?.preferences?.baselineMetadata || {}
+  const baselineMeta = (profile, id) => Object.hasOwn(baselineMetadata(profile), id) ? baselineMetadata(profile)[id] : null
+  const visibleBaselines = active => (active?.baselines || []).filter(row => !baselineMeta(active.profile, row.id)?.removed)
+    .map(row => ({ ...row, label: typeof baselineMeta(active.profile, row.id)?.label === "string" ? baselineMeta(active.profile, row.id).label : "" }))
   const snapshot = () => ({ user: user && { id: user.id, email: user.email },
     profile: bucket?.profile ? { ...clone(bucket.profile), avatarUrl } : null,
-    baselines: clone(bucket?.baselines || []), captures: clone(bucket?.captures || []), threads: clone(bucket?.threads || []),
+    baselines: clone(visibleBaselines(bucket)), captures: clone(bucket?.captures || []), threads: clone(bucket?.threads || []),
     configured, loading, pending: bucket?.outbox.length || 0,
     pendingCaptureDeletes: (bucket?.outbox || []).filter(op => op.type === "captureDelete" && op.durable !== false).map(op => op.recordId),
     error, conflict, guestAvailable, busy: busy(),
@@ -127,8 +131,9 @@
       const preferences = bucket?.profile?.preferences || {}
       window.NeuroFrontI18n?.select(preferences.language || "en", false)
       window.NeuroFrontResources?.setExpanded(preferences.resourcesExpanded === true, false)
-      const active = bucket?.baselines.find(row => row.id === bucket.profile?.active_baseline_id)
-      window.NeuroFrontDevice?.setSavedBaseline(active?.payload || null, bucket?.baselines || [])
+      const baselines = visibleBaselines(bucket)
+      const active = baselines.find(row => row.id === bucket.profile?.active_baseline_id)
+      window.NeuroFrontDevice?.setSavedBaseline(active?.payload || null, baselines)
     } finally { applying = false }
   }
   async function loadAvatar(id, generation) {
@@ -187,6 +192,11 @@
           // The checked RPC distinguishes a stale edit from a retry whose acknowledgement was lost.
           bucket.profile = { ...bucket.profile, ...op.payload }
         }
+      }
+      // A stale queued profile must not briefly re-show tombstones already acknowledged by the server.
+      const acknowledgedRemovals = Object.fromEntries(Object.entries(baselineMetadata(profiles[0])).filter(([, entry]) => entry?.removed === true))
+      if (Object.keys(acknowledgedRemovals).length) {
+        bucket.profile = { ...bucket.profile, preferences: { ...bucket.profile.preferences, baselineMetadata: { ...baselineMetadata(bucket.profile), ...acknowledgedRemovals } } }
       }
       applyCaptureDeletions(bucket)
       bucket.captures.sort((a, b) => b.completedAt.localeCompare(a.completedAt))
@@ -307,8 +317,8 @@
       put(active.baselines, { id, payload: clone(record) })
       queueOwned(active, { type: "baseline", recordId: id, payload: record })
     }
-    if (activate && owner() === expected) await setActiveBaseline(id)
-    else if (activate && active.profile) {
+    if (activate && !baselineMeta(active.profile, id)?.removed && owner() === expected) await setActiveBaseline(id)
+    else if (activate && !baselineMeta(active.profile, id)?.removed && active.profile) {
       const payload = { display_name: active.profile.display_name || "", avatar_path: active.profile.avatar_path || null,
         preferences: active.profile.preferences || {}, active_baseline_id: id }
       queueOwned(active, { type: "profile", recordId: expected, expectedRevision: active.profile.revision, payload })
@@ -367,14 +377,30 @@
       preferences: { ...profile.preferences, ...patch.preferences }, active_baseline_id: profile.active_baseline_id || null }
     for (const key of ["display_name", "avatar_path", "active_baseline_id"]) if (Object.hasOwn(patch, key)) payload[key] = patch[key]
     if (typeof payload.display_name !== "string" || payload.display_name.length > 80) throw fail("validation")
+    // Keep a margin for PostgreSQL JSONB text formatting; never trim tombstones.
+    if (patch.preferences?.baselineMetadata && new TextEncoder().encode(JSON.stringify(payload.preferences)).length > 12000) throw fail("baselineCapacity")
     bucket.profile = { ...profile, ...payload }
     queue({ type: "profile", recordId: owner(), expectedRevision: profile.revision, payload })
     if (!busy()) applyPreferences()
   }
   async function setActiveBaseline(id) {
     if (busy()) throw fail("activeCapture")
-    if (!bucket?.baselines.some(row => row.id === id && window.NeuroFrontDevice.validBaseline(row.payload))) throw fail("baseline")
+    if (!visibleBaselines(bucket).some(row => row.id === id && window.NeuroFrontDevice.validBaseline(row.payload))) throw fail("baseline")
     await updateProfile({ active_baseline_id: id })
+  }
+  async function changeSavedBaseline(id, change) {
+    if (busy()) throw fail("activeCapture")
+    if (!owner() || !bucket?.profile) throw fail("authentication")
+    if (!visibleBaselines(bucket).some(row => row.id === id)) throw fail("baseline")
+    const metadata = { ...baselineMetadata(bucket.profile) }
+    if (change?.removed === true) metadata[id] = { removed: true }
+    else {
+      const label = typeof change?.label === "string" ? change.label.trim() : ""
+      if (!label || label.length > 48) throw fail("baselineName")
+      metadata[id] = { label }
+    }
+    const active = change?.removed === true && id === bucket.profile.active_baseline_id ? { active_baseline_id: null } : {}
+    await updateProfile({ ...active, preferences: { baselineMetadata: metadata } })
   }
   async function saveThread(thread, expected = owner()) {
     if (!expected || expected !== owner() || !bucket) throw fail("authentication")
@@ -528,7 +554,7 @@
   window.addEventListener("online", () => { if (owner()) { error = ""; flush().then(() => refresh()) } })
   window.addEventListener("focus", () => { if (owner() && Date.now() - lastReload > 45000 && !bucket?.outbox.length) refresh() })
   window.NeuroFrontAccount = Object.freeze({ getState: snapshot, owner, isCurrent: id => owner() === id, accessToken, deviceBusy: emit,
-    signIn, signUp, recover, updatePassword, signOut, updateProfile, setActiveBaseline, uploadAvatar,
+    signIn, signUp, recover, updatePassword, signOut, updateProfile, setActiveBaseline, changeSavedBaseline, uploadAvatar,
     saveBaseline, saveCapture, deleteCapture, saveThread, importGuest, selectThread, reload: () => refresh(true),
     retry: async () => { if (conflict) throw fail("conflict"); error = ""; await flush(); if (!bucket?.outbox.length) await refresh() },
     captureSaved: id => Boolean(bucket?.captures.find(record => record.id === id)?.cloudSaved) })

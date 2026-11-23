@@ -48,6 +48,11 @@
         <h3 data-account-text="account.baselines"></h3>
         <label class="account-form"><span class="account-helper" data-account-text="account.activeBaseline"></span><select id="accountBaseline"></select></label>
         <p class="account-helper" data-account-text="account.baselineHelp"></p>
+        <div class="account-form">
+          <label><span data-account-text="account.manageBaseline"></span><select id="accountManageBaseline"></select></label>
+          <label><span data-account-text="account.baselineName"></span><input id="accountBaselineName" type="text" maxlength="48" autocomplete="off"></label>
+          <div class="account-save-row"><button class="action-button ghost" id="accountRenameBaseline" type="button" data-account-text="account.renameBaseline"></button><button class="text-button" id="accountRemoveBaseline" type="button" data-account-text="account.removeBaseline"></button></div>
+        </div>
       </section>
       <section class="account-section account-cloud-section">
         <h3 data-account-text="account.cloudData"></h3>
@@ -63,6 +68,13 @@
       </section>
       <button class="action-button ghost account-signout" id="accountSignOut" type="button" data-account-text="account.signOut"></button>
     </div>
+    <section class="account-section" id="accountGuestBaselineManagement" hidden>
+      <h3 data-account-text="account.guestBaseline"></h3><p class="account-helper" data-account-text="account.guestBaselineHelp"></p>
+      <div class="account-form">
+        <label><span data-account-text="account.baselineName"></span><input id="accountGuestBaselineName" type="text" maxlength="48" autocomplete="off"></label>
+        <div class="account-save-row"><button class="action-button ghost" id="accountRenameGuestBaseline" type="button" data-account-text="account.renameBaseline"></button><button class="text-button" id="accountRemoveGuestBaseline" type="button" data-account-text="account.removeBaseline"></button></div>
+      </div>
+    </section>
     <p class="account-feedback" id="accountFeedback" role="status" hidden></p>
     <p class="account-error" id="accountError" role="alert" hidden></p>`
   document.body.append(dialog)
@@ -85,6 +97,8 @@
   let renderedUser = null
   let lastThreadSignature = ""
   let lastBaselineSignature = ""
+  let lastGuestBaselineSignature = ""
+  let managedBaselineId = ""
   let greetingTimer
 
   function renderGreeting(current = state()) {
@@ -116,7 +130,7 @@
       weak_password: "password", password: "password", password_mismatch: "match", match: "match",
       invalid_email: "email", email: "email", user_already_exists: "exists", email_exists: "exists",
       over_email_send_rate_limit: "rate", over_request_rate_limit: "rate", rate: "rate", rate_limit: "rate",
-      avatar: "avatar", invalid_avatar: "avatar", network: "network", offline: "network", storage: "storage",
+      avatar: "avatar", invalid_avatar: "avatar", baselineName: "baselineName", baselineCapacity: "baselineCapacity", network: "network", offline: "network", storage: "storage",
       session_expired: "session", session: "session", recovery: "recovery", not_authenticated: "session"
     }
     return `account.error.${codes[code] || "generic"}`
@@ -169,6 +183,8 @@
       renderedUser = user?.id || null
       lastThreadSignature = ""
       lastBaselineSignature = ""
+      managedBaselineId = ""
+      lastGuestBaselineSignature = ""
       if (mode !== "reset") mode = "signin"
       byId("accountDisplayName").value = profile.display_name || ""
     }
@@ -211,6 +227,14 @@
       toggle.setAttribute("aria-pressed", String(visible))
       toggle.setAttribute("aria-label", `${text("account.password")}: ${toggle.textContent}`)
     })
+    const guestBaseline = !user && mode !== "reset" && window.NeuroFrontDevice?.guestBaseline?.()
+    byId("accountGuestBaselineManagement").hidden = !guestBaseline
+    const guestSignature = JSON.stringify(guestBaseline || null)
+    if (lastGuestBaselineSignature !== guestSignature) {
+      lastGuestBaselineSignature = guestSignature
+      byId("accountGuestBaselineName").value = guestBaseline?.label || ""
+    }
+    for (const id of ["accountGuestBaselineName", "accountRenameGuestBaseline", "accountRemoveGuestBaseline"]) byId(id).disabled = Boolean(locked || !guestBaseline)
     if (user) {
       byId("accountProfileName").textContent = profile.display_name || text("account.profile")
       byId("accountProfileEmail").textContent = user.email || ""
@@ -220,14 +244,25 @@
       byId("accountLanguage").value = profile.preferences?.language || locale()
       byId("accountResources").checked = Boolean(profile.preferences?.resourcesExpanded)
       const baselines = current.baselines || []
-      const baselineSignature = JSON.stringify([locale(), profile.active_baseline_id, baselines.map(item => [item.id, item.payload?.createdAt, item.created_at])])
+      const baselineSignature = JSON.stringify([locale(), profile.active_baseline_id, baselines.map(item => [item.id, item.label, item.payload?.createdAt, item.created_at])])
       if (lastBaselineSignature !== baselineSignature) {
         lastBaselineSignature = baselineSignature
         byId("accountBaseline").replaceChildren(new Option(text("account.noBaseline"), ""))
-        for (const baseline of baselines) byId("accountBaseline").add(new Option(formatDate(baseline.payload?.createdAt || baseline.payload?.calibratedAt || baseline.created_at), baseline.id))
-        byId("accountBaseline").value = profile.active_baseline_id || ""
+        byId("accountManageBaseline").replaceChildren(new Option(text("account.chooseManagedBaseline"), ""))
+        for (const baseline of baselines) {
+          const date = formatDate(baseline.payload?.createdAt || baseline.payload?.calibratedAt || baseline.created_at)
+          const label = baseline.label ? baseline.label + " · " + date : date
+          byId("accountBaseline").add(new Option(label, baseline.id))
+          byId("accountManageBaseline").add(new Option(label, baseline.id))
+        }
+        if (!baselines.some(row => row.id === managedBaselineId)) managedBaselineId = ""
+        byId("accountManageBaseline").value = managedBaselineId
+        byId("accountBaselineName").value = baselines.find(row => row.id === managedBaselineId)?.label || ""
+        byId("accountBaseline").value = baselines.some(row => row.id === profile.active_baseline_id) ? profile.active_baseline_id : ""
       }
       byId("accountBaseline").disabled = Boolean(locked || !baselines.length || current.conflict)
+      byId("accountManageBaseline").disabled = Boolean(locked || !baselines.length || current.conflict)
+      for (const id of ["accountBaselineName", "accountRenameBaseline", "accountRemoveBaseline"]) byId(id).disabled = Boolean(locked || !managedBaselineId || current.conflict)
       byId("accountRecordCounts").textContent = text("account.recordCounts", { baselines: baselines.length, captures: (current.captures || []).length })
       const saveKey = current.conflict ? "account.conflictShort" : current.error ? "account.saveError" : current.loading || !current.profile ? "account.loading" : pending ? "account.pending" : current.status === "saved" || current.status === "ready" ? "account.saved" : "account.syncReady"
       byId("accountCloudStatus").textContent = text(saveKey, { count: pending })
@@ -266,10 +301,12 @@
       byId("accountProfileAvatar").removeAttribute("src")
       byId("accountThreadList").replaceChildren()
       byId("accountBaseline").replaceChildren()
+      byId("accountManageBaseline").replaceChildren()
+      byId("accountBaselineName").value = ""
     }
     renderFeedback()
   }
-  async function run(task, successKey) {
+  async function run(task, successKey, localOnly = false) {
     if (working) return
     if (state().busy) { feedback("account.error.activeCapture", true); return }
     const id = ++operation
@@ -277,7 +314,7 @@
     feedback()
     render()
     try {
-      if (!api() || state().configured === false) throw { code: "configuration" }
+      if (!localOnly && (!api() || state().configured === false)) throw { code: "configuration" }
       const result = await task()
       if (id !== operation) return
       if (result?.error) throw result.error
@@ -366,6 +403,29 @@
     const id = event.target.value
     if (id) run(() => api().setActiveBaseline(id))
     else render()
+  })
+  byId("accountManageBaseline").addEventListener("change", event => {
+    managedBaselineId = event.target.value
+    lastBaselineSignature = ""
+    render()
+  })
+  byId("accountRenameBaseline").addEventListener("click", () => {
+    const id = managedBaselineId
+    const label = byId("accountBaselineName").value
+    if (id) run(() => api().changeSavedBaseline(id, { label }))
+  })
+  byId("accountRemoveBaseline").addEventListener("click", () => {
+    const id = managedBaselineId
+    if (id && window.confirm(text("account.confirmRemoveBaseline"))) run(() => api().changeSavedBaseline(id, { removed: true }))
+  })
+  byId("accountRenameGuestBaseline").addEventListener("click", () => {
+    const record = window.NeuroFrontDevice?.guestBaseline?.()
+    const label = byId("accountGuestBaselineName").value
+    if (record) run(() => window.NeuroFrontDevice.changeGuestBaseline(record.createdAt, { label }), "account.guestBaselineRenamed", true)
+  })
+  byId("accountRemoveGuestBaseline").addEventListener("click", () => {
+    const record = window.NeuroFrontDevice?.guestBaseline?.()
+    if (record && window.confirm(text("account.confirmRemoveBaseline"))) run(() => window.NeuroFrontDevice.changeGuestBaseline(record.createdAt, { removed: true }), "account.guestBaselineRemoved", true)
   })
   byId("accountImport").addEventListener("click", () => run(() => api().importGuest()))
   byId("accountRetry").addEventListener("click", () => run(() => api().retry()))

@@ -167,7 +167,7 @@ const tests = {
     app.calibrate()
     app.tick("1.65,36.5,4.1\0")
     const lastValid = app.evaluate("state.lastIncomingTime")
-    for (const raw of ["", "\0", "status:ready", "NaN,36.5,4.1", "Infinity,36.5,4.1", ",36.5,4.1"]) {
+    for (const raw of ["", "\0", "status:ready", "NaN,36.5,4.1", "7broken,36.5,4.1", "1e308,36.5,4.1", "Infinity,36.5,4.1", ",36.5,4.1"]) {
       app.tick(raw)
       assert.equal(app.evaluate("state.lastIncomingTime"), lastValid, `Invalid payload ${JSON.stringify(raw)} must not make the signal fresh`)
       assert.equal(app.evaluate("state.bluetoothValue"), 1.65, "Invalid data must not replace the last valid numeric sample")
@@ -179,6 +179,17 @@ const tests = {
     assert.equal(app.evaluate("state.measurement.samples.length"), 0, "Invalid notifications must not manufacture stale or zero samples")
     assert.equal(app.evaluate("state.measurement.completed"), false)
     assert.equal(app.savedCaptures.length, 0, "No-data capture must never become a completed history record")
+  },
+  async interruptedStandardCaptureCannotBecomeARecordedScore() {
+    const app = await fixture()
+    app.calibrate()
+    app.evaluate("startMeasurement()")
+    for (let index = 0; index < 50; index++) app.valueTick(captureWave(index))
+    for (let index = 50; index < 300; index++) app.tick()
+    assert.equal(app.evaluate("state.measurement.active"), false)
+    assert.equal(app.evaluate("state.measurement.completed"), false)
+    assert.equal(app.evaluate("state.measurement.samples.length"), 0)
+    assert.equal(app.savedCaptures.length, 0)
   },
   async malformedOnlyStreamDoesNotCreateZeroSamples() {
     const app = await fixture()
