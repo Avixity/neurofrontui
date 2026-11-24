@@ -564,9 +564,14 @@
   document.addEventListener("neurofront:devicebusy", emit)
   window.addEventListener("online", () => { if (owner()) { error = ""; flush().then(() => refresh()) } })
   window.addEventListener("focus", () => { if (owner() && Date.now() - lastReload > 45000 && !bucket?.outbox.length) refresh() })
+  const adaptiveRpc = Object.freeze({ save: "nf_save_adaptive_summary", list: "nf_list_adaptive_summaries", remove: "nf_remove_adaptive_summary" })
+  function adaptiveSync(operation, payload, expected, signal) {
+    if (!sessionResolved || !expected || owner() !== expected || !Object.hasOwn(adaptiveRpc, operation)) throw fail("authentication")
+    return rpc(adaptiveRpc[operation], payload, expected, signal)
+  }
   window.NeuroFrontAccount = Object.freeze({ getState: snapshot, owner, sessionResolved: () => sessionResolved, isCurrent: id => owner() === id, accessToken, deviceBusy: emit,
     signIn, signUp, recover, updatePassword, signOut, updateProfile, setActiveBaseline, changeSavedBaseline, uploadAvatar,
-    saveBaseline, saveCapture, deleteCapture, saveThread, importGuest, selectThread, reload: () => refresh(true),
+    saveBaseline, saveCapture, deleteCapture, saveThread, importGuest, selectThread, adaptiveSync, reload: () => refresh(true),
     retry: async () => { if (conflict) throw fail("conflict"); error = ""; await flush(); if (!bucket?.outbox.length) await refresh() },
     captureSaved: id => Boolean(bucket?.captures.find(record => record.id === id)?.cloudSaved) })
   initialize()
