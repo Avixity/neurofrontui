@@ -2,12 +2,12 @@
   "use strict"
   Object.assign(window.NEUROFRONT_TRANSLATIONS.en, {
     "dash.adaptiveAbout": "About Adaptive sessions",
-    "dash.adaptiveAboutNote": "Adaptive compares successive readings with your chosen baseline until you stop or the timer ends. The session summary stays in this browser, even when signed in; no raw recordings are saved.",
+    "dash.adaptiveAboutNote": "Adaptive compares successive readings with your chosen baseline until you stop or the timer ends. Summaries stay in this browser by default. If signed in, you can opt in to sync new summaries. No raw signals are saved.",
     "dash.baselinePreferenceFailed": "The baseline change was not saved. Try again."
   })
   Object.assign(window.NEUROFRONT_TRANSLATIONS.hi || {}, {
     "dash.adaptiveAbout": "एडैप्टिव सत्रों के बारे में",
-    "dash.adaptiveAboutNote": "आपके रोकने या टाइमर के खत्म होने तक, एडैप्टिव लगातार रीडिंग की तुलना चुनी हुई बेसलाइन से करता है। सत्र का सारांश इसी ब्राउज़र में रहता है; मूल रिकॉर्डिंग सेव नहीं होती।",
+    "dash.adaptiveAboutNote": "आपके रोकने या टाइमर के खत्म होने तक, एडैप्टिव रीडिंग की तुलना चुनी हुई बेसलाइन से करता है। सारांश डिफ़ॉल्ट रूप से इसी ब्राउज़र में रहते हैं। साइन इन होने पर आप नए सारांश सिंक करना चुन सकते हैं। मूल सिग्नल सेव नहीं होते।",
     "dash.baselinePreferenceFailed": "बेसलाइन का बदलाव सेव नहीं हुआ। फिर कोशिश करें।"
   })
   const keys = ["mode","standard","adaptive","measurement","data","dock","reference","duration","five","ten","start","stop","elapsed","session","intro","privacy","ready","running","missing","cancelled","lost","invalid","completed","coverage","visibility","changed","contact","noScore"]
