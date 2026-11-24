@@ -181,16 +181,35 @@
   let renderedOwner
   const localOnlyStatus = document.createElement("p")
   const options = document.createElement("div"), choice = document.createElement("input"), label = document.createElement("label"), syncStatus = document.createElement("p"), loadOlder = document.createElement("button")
+  const archiveHeading = document.getElementById("adaptiveArchiveTitle")
   options.hidden = true
+  options.className = "adaptive-sync-options"
+  label.className = "adaptive-sync-choice"
   choice.type = "checkbox"
   const labelText = document.createElement("span")
   label.append(choice,labelText)
-  const explanation = document.createElement("small")
+  const help = document.createElement("details"), helpTitle = document.createElement("summary")
+  help.className = "adaptive-sync-help"
+  const explanation = document.createElement("p")
+  help.append(helpTitle,explanation)
+  syncStatus.className = "adaptive-sync-message"
+  localOnlyStatus.className = "adaptive-sync-message"
   loadOlder.type = "button"
   loadOlder.addEventListener("click", () => flush(true))
   syncStatus.setAttribute("role","status")
-  options.append(label,explanation,syncStatus,localOnlyStatus,loadOlder)
-  ui.adaptiveArchiveStatus.after(options)
+  loadOlder.className = "action-button ghost compact-button adaptive-sync-load"
+  const toolbar = document.createElement("div")
+  toolbar.className = "adaptive-sync-toolbar"
+  toolbar.append(label,help)
+  options.append(toolbar,syncStatus,localOnlyStatus)
+  ;(archiveHeading || ui.adaptiveArchiveEmpty).before(options)
+  if (archiveHeading) {
+    const headingRow = document.createElement("div")
+    headingRow.className = "adaptive-archive-head"
+    options.before(headingRow)
+    headingRow.append(archiveHeading,options)
+  }
+  ui.adaptiveArchiveList.after(loadOlder)
   choice.addEventListener("change", () => {
     const id = owner()
     if (!canSync(id)) return
@@ -242,6 +261,7 @@
     ui.adaptiveArchiveEmpty.hidden = unavailable || data.length > 0
     ui.adaptiveArchiveStatus.hidden = !unavailable
     options.hidden = !canSync(id)
+    if (options.hidden) help.open = false
     let pending = false, localOnly = false
     try {
       choice.checked = permitted(id)
@@ -254,6 +274,7 @@
     } catch { syncFailure = Boolean(canSync(id)) }
     const hindi = document.documentElement.lang === "hi"
     labelText.textContent = hindi ? " नए Adaptive सारांश इस खाते में सिंक करें" : " Sync new Adaptive summaries to this account"
+    helpTitle.textContent = hindi ? "जानकारी" : "Sync details"
     explanation.textContent = hindi
       ? " खाते में अनुमान, तारीख, अवधि, मोड और विंडो की संख्या जाती हैं। पुराने सत्र और मूल सिग्नल अपलोड नहीं होते। बंद करने पर नए और अभी न भेजे गए सारांश इसी ब्राउज़र में रहेंगे।"
       : " Syncs the estimate, timestamp, duration, mode and window count, not raw signals or older sessions. Turn it off to keep new and unsent summaries in this browser. Previously synced summaries remain in your account until deleted."
@@ -262,6 +283,7 @@
       : pending ? (hindi ? " सिंक बाकी है।" : " Sync pending.") : choice.checked
         ? (hindi ? " नए सारांशों का सिंक चालू है।" : " Sync on for new summaries.")
         : (hindi ? " नए सारांशों का सिंक रुका है।" : " Sync paused for new summaries.")
+    syncStatus.classList.toggle("adaptive-sync-announcement", !syncFailure && !pending)
     localOnlyStatus.hidden = !localOnly
     localOnlyStatus.textContent = localOnly
       ? (hindi ? " कुछ सारांश सिर्फ़ इस ब्राउज़र में हैं और अपने आप सिंक नहीं होंगे।" : " Some summaries are only in this browser and will not sync automatically.") : ""

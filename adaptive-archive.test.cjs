@@ -10,7 +10,7 @@ function fixture(storage = new Map(), id = null, resolved = true, adaptiveSync) 
   const elements = new Map(), events = new Map(), windowEvents = new Map()
   const node = () => ({
     children:[], open:false, hidden:false, textContent:"",
-    setAttribute() {}, after(...children) { this.controls = children }, addEventListener(name,fn) { this[name] = fn }, append(...children) { this.children.push(...children) },
+    classList:{toggle() {}}, setAttribute() {}, before(...children) { this.controls = children }, after(...children) { this.controls = children }, addEventListener(name,fn) { this[name] = fn }, append(...children) { this.children.push(...children) },
     replaceChildren(...children) { this.children = children }
   })
   const document = {
@@ -25,7 +25,7 @@ function fixture(storage = new Map(), id = null, resolved = true, adaptiveSync) 
   return { archive:window.NeuroFrontAdaptiveHistory, list:elements.get("adaptiveArchiveList"), ui:elements,
     session(next, ready = true) { id = next; resolved = ready; events.get("neurofront:accountreset")() },
     async online() { windowEvents.get("online")(); await new Promise(r=>setImmediate(r)) },
-    opt(value) { const choice = elements.get("adaptiveArchiveStatus").controls[0].children[0].children[0]; choice.checked=value; choice.change() },
+    opt(value) { const choice = elements.get("adaptiveArchiveTitle").controls[0].children[0].children[0].children[0]; choice.checked=value; choice.change() },
     fail() { failWrite = true }
   }
 }

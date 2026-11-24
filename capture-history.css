@@ -59,7 +59,8 @@
 
 @media (min-width: 641px) {
   .capture-row { align-items:stretch; }
-  .capture-row > .summary-panel { display:flex; flex-direction:column; align-self:stretch; }
+  .capture-row > :is(.summary-panel, .history-panel) { align-self:stretch; }
+  .capture-row > .summary-panel { display:flex; flex-direction:column; }
   .summary-panel .stress-summary-launch { flex:1; }
 }
 .stress-selected-day { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: rgba(10, 16, 25, 0.72); }
