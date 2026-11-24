@@ -17,6 +17,22 @@
   const number = value => new Intl.NumberFormat(lang(), { maximumFractionDigits: 1 }).format(value)
   const isCurrent = expected => owner() === expected && (!account()?.isCurrent || account().isCurrent(expected))
 
+  const offlineFaqs = [
+    [/^(?:(?:what is (?:a |my )?|what does (?:a |my )?)baseline(?: (?:mean|in neurofront))?|(?:how (?:do|can) i )?(?:choose|select|change|save|reuse)(?: a| my| the| another| a saved)? baseline)$/, "A baseline is your resting reference. NeuroFront compares new measurements with the selected baseline. Choose a saved baseline or use Recalibrate to record a new one; changing it does not change past captures.", "baseline"],
+    [/^(?:how (?:do|can) i )?(?:start|take|run|repeat|do|begin) (?:a |the |another )?(?:standard )?(?:measurement|capture)(?: in neurofront)?$/, "In Standard mode, connect the device and select a baseline. Choose Start Measurement to open the guide, then Begin Measurement to start the capture. Measure Again keeps your chosen baseline.", "getting-started"],
+    [/^(?:what is (?:an |the )?(?:adaptive (?:session|mode)|adaptive)|how (?:do|can) i (?:start|run|stop|use) (?:an |the )?adaptive(?: session| mode)?)$/, "Adaptive mode follows the signal over time. Choose a baseline and optionally set a duration before starting. Stop when finished; only sessions with enough usable data are saved.", "getting-started"],
+    [/^(?:(?:what is|where is) (?:the |my )?(?:stress summary|monthly stress calendar)|how (?:do|can) i (?:open|view|see|use) (?:the |my )?(?:stress summary|monthly stress calendar))$/, "Stress Summary shows scores from saved captures, not continuous readings. Open the detailed summary and pick a date to see the scores recorded that day.", "readings"],
+    [/^(?:(?:what is|where is) (?:the |my )?(?:capture history|measurement history)|(?:how|where) (?:do|can) i (?:view|find|see|open) (?:my |the )?(?:capture history|measurement history|saved captures|past captures))$/, "Open Capture History on the dashboard to see saved Standard captures. Adaptive sessions are listed separately in that section.", "readings"],
+    [/^(?:how (?:do|can) i )?(?:connect|pair) (?:my |the )?neurofront(?: device| headband)?$/, "Use Connect in a browser that supports Bluetooth, then select your NeuroFront device from the browser's Bluetooth picker. Once connected, choose your baseline before measuring.", "getting-started"]
+  ]
+  function offlineQuestion(job) {
+    if (job.explanation || job.missingCapture) return null
+    const last = job.dialogue.at(-1)
+    if (last?.role !== "user") return null
+    const query = last.content.toLowerCase().trim().replace(/[?.!]+$/, "").replace(/\s+/g, " ")
+    return offlineFaqs.find(([pattern]) => pattern.test(query)) || null
+  }
+
   function preset(capture) {
     return `${t(`assistant.preset.${window.NeuroFrontScore.classify(capture.stress.score).id}`, { score: Math.round(capture.stress.score) })} ${t("assistant.reference", { date: date(capture.baseline.createdAt) })} ${t("assistant.experimental")}`
   }
@@ -124,6 +140,7 @@
           button.disabled = Boolean(request)
           button.addEventListener("click", () => { const job = retryFor(message); if (job) respond(job) })
           element.append(button)
+          if (message.status === "failed") element.append(resourceLink("getting-started"))
         }
       } else {
         const paragraph = document.createElement("p")
@@ -280,6 +297,7 @@
     statusKey = "assistant.loading"
     persist()
     render()
+    let offlineEligible = navigator.onLine === false
     const timeout = setTimeout(() => controller.abort(), 30000)
     try {
       if (job.missingCapture) throw new Error("Capture unavailable")
@@ -305,7 +323,9 @@
         headers.Authorization = `Bearer ${token}`
         body.accountCaptureId = job.capture?.id || null
       }
+      offlineEligible = true
       const response = await fetch("/api/assistant", { method: "POST", headers, signal: controller.signal, body: JSON.stringify(body) })
+      offlineEligible = response.status >= 500 || response.status === 429
       const result = await response.json()
       if (currentGeneration !== generation || !isCurrent(expectedOwner)) return
       if (response.status === 422 && result.error?.code === "unsafe_request") {
@@ -324,8 +344,18 @@
       statusKey = ""
     } catch {
       if (currentGeneration !== generation || !isCurrent(expectedOwner)) return
-      responseMessage.status = "failed"
-      statusKey = job.capture ? "assistant.unavailable" : "assistant.genericUnavailable"
+      const faq = offlineEligible && offlineQuestion(job)
+      if (faq) {
+        const [, answer, resourceId] = faq
+        Object.assign(responseMessage, { kind: "reply", status: "completed", content: "Offline guide: " + answer, resourceIds: [resourceId] })
+        delete responseMessage.retryJob
+        delete responseMessage.job
+        retry = null
+        statusKey = ""
+      } else {
+        responseMessage.status = "failed"
+        statusKey = job.capture ? "assistant.unavailable" : "assistant.genericUnavailable"
+      }
     } finally {
       clearTimeout(timeout)
       if (currentGeneration === generation && isCurrent(expectedOwner)) { request = null; persist(); render() }

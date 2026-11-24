@@ -4,7 +4,9 @@
       "history.title": "Capture History",
       "history.open": "View history",
       "history.stressSummary": "Stress Summary",
-      "history.calendarTeaser": "Explore the scores from your saved captures.",
+      "history.calendarTeaser": "Your monthly stress at a glance.",
+      "history.calendarPreviewTitle": "Monthly stress calendar",
+      "history.calendarPreviewOpen": "Open detailed stress summary",
       "history.calendarOpen": "View detailed summary",
       "history.storageNoteAccount": "Standard captures sync to your account.",
       "history.calendarNote": "Scores are from saved captures only, not continuous stress readings. Times are local.",
@@ -548,6 +550,11 @@
   }
   for (const [locale, values] of Object.entries(additions)) {
     if (calendarLabels[locale]) calendarKeys.forEach((key, i) => { values[`history.${key}`] = calendarLabels[locale][i] })
+    if (locale === "hi") Object.assign(values, {
+      "history.calendarTeaser": "इस महीने का तनाव एक नज़र में।",
+      "history.calendarPreviewTitle": "मासिक तनाव कैलेंडर",
+      "history.calendarPreviewOpen": "तनाव का विस्तृत सारांश खोलें"
+    })
     values["history.loading"] = loadingLabels[locale]
     detailKeys.forEach((key, index) => { values[`history.${key}`] = detailLabels[locale][index] })
     deleteKeys.forEach((key, index) => { values[`history.${key}`] = deleteLabels[locale][index] })

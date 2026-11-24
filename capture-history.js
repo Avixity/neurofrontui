@@ -5,7 +5,7 @@
   const elements = Object.fromEntries([
     "historyList", "historyEmpty", "historyStatus", "historyRetry", "historyLoadMore",
     "historyOpen", "historyClose", "historyDialog", "historyGroups", "historyDialogNotice", "historyStorageLabel",
-    "stressSummaryDialog", "stressSummaryOpen", "stressSummaryClose", "stressSummaryPrevious", "stressSummaryNext",
+    "stressSummaryDialog", "stressSummaryOpen", "stressPreviewOpen", "stressSummaryClose", "stressSummaryPrevious", "stressSummaryNext",
     "stressPreviewMonth", "stressPreviewWeekdays", "stressPreviewDays", "stressPreviewStatus", "historyStorageNote",
     "stressSummaryStatus", "stressSummaryMonth", "stressSummaryWeekdays", "stressSummaryDays", "stressSummaryDay",
     "stressSummaryDayCard", "stressSummaryDayNarrative", "stressSummaryDayNext", "stressSummaryDayMetrics", "stressSummaryDayDetails", "stressSummaryDayRecords", "stressSummaryTimes", "stressSummaryToday", "stressSummaryTodayNarrative", "stressSummaryDetails",
@@ -201,6 +201,7 @@
   let summaryToken = 0
   let summaryData = null
   let previewToken = 0
+  let summaryOpener = null
 
   async function readGuestMonth(first, next) {
     const db = await openDatabase()
@@ -767,7 +768,8 @@
     link.click()
   }
 
-  elements.stressSummaryOpen.addEventListener("click", () => {
+  function openStressSummary(event) {
+    summaryOpener = event?.currentTarget || elements.stressSummaryOpen
     const today = new Date()
     summaryMonth = monthOf(today)
     summaryDay = today.getDate()
@@ -775,7 +777,9 @@
     elements.stressSummaryDialog.scrollTop = 0
     refreshSummary(undefined, true)
     elements.stressSummaryClose.focus({ preventScroll: true })
-  })
+  }
+  elements.stressSummaryOpen.addEventListener("click", openStressSummary)
+  elements.stressPreviewOpen.addEventListener("click", openStressSummary)
   elements.stressSummaryPrevious.addEventListener("click", () => changeSummaryMonth(-1))
   elements.stressSummaryNext.addEventListener("click", () => changeSummaryMonth(1))
   elements.stressSummaryClose.addEventListener("click", () => elements.stressSummaryDialog.close())
@@ -792,7 +796,8 @@
     elements.stressSummaryDayNext.textContent = ""
     elements.stressSummaryDayDetails.textContent = ""
     elements.stressSummaryDayRecords.replaceChildren()
-    elements.stressSummaryOpen.focus({ preventScroll: true })
+    ;(summaryOpener || elements.stressSummaryOpen).focus({ preventScroll: true })
+    summaryOpener = null
   })
   elements.historyOpen.addEventListener("click", () => {
     elements.historyDialog.showModal()

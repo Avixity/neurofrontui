@@ -158,7 +158,7 @@ if (process.env.CHROMIUM_PATH) launch.executablePath = process.env.CHROMIUM_PATH
   await recoveryPage.goto(url)
   await recoveryPage.waitForFunction(() => !document.getElementById('historyRetry').hidden)
   assert.match(await recoveryPage.locator('#historyStatus').textContent(), /could not be loaded/)
-  assert.equal(await recoveryPage.evaluate(() => state.flow), 'baseline')
+  assert.equal(await recoveryPage.evaluate(() => state.flow), 'ready', 'A history read failure does not prevent restoring the baseline')
   await recoveryPage.evaluate(() => { window.failHistoryRead = false })
   await recoveryPage.locator('#historyRetry').click()
   await recoveryPage.waitForFunction(() => document.querySelectorAll('#historyList li').length === 2)

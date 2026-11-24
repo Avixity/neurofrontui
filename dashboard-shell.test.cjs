@@ -56,7 +56,7 @@ const url = process.env.NEUROFRONT_URL || "http://127.0.0.1:5180"
         const checkTimer = async () => {
           const count = await locator("#countdownValue").boundingBox(), units = await locator(".countdown-core small").boundingBox()
           const ring = await locator(".countdown-ring").boundingBox()
-          assert.ok(Math.abs((count.x + count.width / 2) - (ring.x + ring.width / 2)) < 2, "Timer numeral is centered independently of seconds unit")
+          assert.ok(Math.abs((count.x + (units.x + units.width - count.x) / 2) - (ring.x + ring.width / 2)) < 2, "Timer numeral and seconds unit are centered together")
           assert.ok(Math.abs(units.x - (count.x + count.width)) < 8 && Math.abs(units.y - count.y) < count.height, "Seconds unit sits alongside the numeral")
           assert.ok(units.height < count.height, "Seconds unit is smaller")
         }
@@ -239,7 +239,7 @@ const url = process.env.NEUROFRONT_URL || "http://127.0.0.1:5180"
           assert.equal(await locator("#adaptiveCoverage").isVisible(), false)
           await page.reload()
           await page.waitForFunction(() => NeuroFrontAccount.sessionResolved())
-          await locator("#adaptiveArchive summary").click()
+          assert.ok(await locator("#adaptiveArchiveTitle").isVisible(), "Adaptive archive does not need expanding")
           assert.equal(await locator("#adaptiveArchiveList li").count(),4)
           assert.match(await locator("#adaptiveArchiveList li").first().textContent(), /01:00 elapsed.*Custom.*1 min/)
           assert.match(await locator("#adaptiveArchiveList li").nth(1).textContent(), /10:10 elapsed.*Unlimited.*Ended by you/)

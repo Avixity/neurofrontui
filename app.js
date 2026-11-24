@@ -35,6 +35,7 @@ const refs = {
   stressFeedback: document.getElementById("stressFeedback"),
   baselineNote: document.getElementById("baselineNote"),
   baselineSelect: document.getElementById("baselineSelect"),
+  baselineSelectedName: document.getElementById("baselineSelectedName"),
   baselinePlaceholder: document.getElementById("baselinePlaceholder"),
   connectButton: document.getElementById("connectButton"),
   measureButton: document.getElementById("measureButton"),
@@ -437,6 +438,10 @@ function syncBaselinePicker() {
       [...state.baselineOptions].find(([, record]) => record.createdAt === state.baseline.createdAt)?.[0] || "")
     : ""
   if (refs.baselineSelect.value !== selectedKey) refs.baselineSelect.value = selectedKey
+  const name = selectedKey === "saved" ? state.savedBaseline?.label :
+    state.accountBaselines.find(row => row.id === selectedKey)?.label
+  setTextIfChanged(refs.baselineSelectedName, typeof name === "string" ? name : "")
+  setFlagIfChanged(refs.baselineSelectedName, "hidden", !name)
 }
 
 function updateSavedBaselineInfo() {

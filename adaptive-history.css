@@ -4,8 +4,7 @@
 .adaptive-actions .action-button { min-width:min(100%, 150px); }
 .adaptive-panel > .control-note { text-align:center; }
 .adaptive-archive { margin-top:16px; padding-top:12px; border-top:1px solid var(--border-strong); min-width:0; }
-.adaptive-archive > summary { cursor:pointer; font-weight:650; min-height:44px; align-content:center; }
-.adaptive-archive > summary:focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:4px; }
+.adaptive-archive > h3 { margin:0 0 10px; }
 .adaptive-archive .control-note { margin:5px 0 12px; }
 .adaptive-archive-list { list-style:none; margin:0; padding:0; max-height:min(55vh, 26rem); overflow:auto; overscroll-behavior:contain; }
 .adaptive-archive-list:empty { display:none; }

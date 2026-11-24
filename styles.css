@@ -1546,9 +1546,9 @@ html { scroll-padding-bottom:calc(min(240px, 48dvh) + env(safe-area-inset-bottom
   .dashboard-rail .assistant-launcher-label,.dashboard-rail .assistant-callout { display:none; }
 }
 @media(max-width:480px) { .mode-picker select { max-width:min(48vw, 12rem); text-overflow:ellipsis; } }
-.countdown-core { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-content:center; align-items:baseline; gap:0; transform:none; direction:ltr; }
-.countdown-core #countdownValue { grid-column:2; font-variant-numeric:tabular-nums; text-align:center; }
-.countdown-core small { grid-column:3; justify-self:start; margin-left:2px; font-size:.7rem; font-weight:600; letter-spacing:0; }
+.countdown-core { display:flex; flex-direction:row; justify-content:center; align-items:baseline; inset:50% 0 auto; gap:2px; transform:translateY(-50%); direction:ltr; }
+.countdown-core #countdownValue { font-variant-numeric:tabular-nums; text-align:center; }
+.countdown-core small { font-size:.66rem; font-weight:600; letter-spacing:0; }
 .stress-baseline-picker { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:7px; }
 .stress-baseline-picker > label,.stress-baseline-picker .control-note { grid-column:1 / -1; }
 .stress-baseline-picker .baseline-buttons { display:block; }
@@ -1566,7 +1566,7 @@ html { scroll-padding-bottom:calc(min(240px, 48dvh) + env(safe-area-inset-bottom
 .mode-adaptive .chart-panel,.mode-adaptive .metric-panel > .metric-card:not(.stress-card),
 .mode-adaptive .stress-card > :not(.stress-baseline-picker):not(.baseline-note):not(.adaptive-baseline-explainer),
 .mode-adaptive .controls-panel .session-action-area { display:none; }
-.mode-adaptive .metric-panel { display:flex; align-items:flex-start; }
+.mode-adaptive .metric-panel { display:flex; align-items:stretch; }
 .mode-adaptive .stress-card { width:100%; }
 .mode-adaptive:not(.adaptive-calibrating) .timer-panel { display:none; }
 .mode-adaptive:not(.adaptive-calibrating) .lower-controls { grid-column:1 / -1; }
@@ -1589,7 +1589,7 @@ html { scroll-padding-bottom:calc(min(240px, 48dvh) + env(safe-area-inset-bottom
 
 .metric-card.stress-card > .stress-baseline-picker { grid-column:1 / -1; width:100%; justify-self:stretch; }
 .mode-adaptive .metric-card.stress-card { display:flex; flex-direction:column; align-items:stretch; gap:12px; }
-.mode-adaptive .stress-card > .baseline-note { order:2; align-self:flex-start; text-align:start; }
+.mode-adaptive .stress-card > .baseline-note { order:-1; align-self:flex-start; text-align:start; }
 @media(max-width:860px) {
   .metric-card.stress-card { grid-column:1 / -1; grid-template-columns:minmax(0,1fr); }
   .metric-card.stress-card > :is(.baseline-note,.stress-label) { grid-column:1; grid-row:auto; text-align:start; }
@@ -1598,6 +1598,15 @@ html { scroll-padding-bottom:calc(min(240px, 48dvh) + env(safe-area-inset-bottom
 .topbar:has(.language-menu:not([hidden])) { position:relative; z-index:32; }
 
 .adaptive-baseline-explainer { display:none; }
-.mode-adaptive .adaptive-baseline-explainer { order:3; display:block; border:1px solid var(--border); border-radius:var(--radius-sm); background:rgba(10,16,25,.52); padding:12px; }
+.mode-adaptive .adaptive-baseline-explainer { display:grid; align-content:center; flex:1 1 0; border:1px solid var(--border); border-radius:var(--radius-sm); background:rgba(10,16,25,.52); padding:14px; }
 .adaptive-baseline-explainer h3 { font-size:.88rem; margin:0 0 5px; }
-.mode-adaptive .stress-baseline-picker { margin-top:0; padding-top:0; border-top:0; }
+.mode-adaptive .stress-baseline-picker { flex:1 1 0; align-content:center; margin-top:0; border:1px solid var(--border); border-radius:var(--radius-sm); background:rgba(10,16,25,.52); padding:14px; }
+
+.baseline-field { min-width:0; position:relative; }
+.baseline-selected-name { pointer-events:none; position:absolute; inset-block:2px; inset-inline:2px 26px; background:#121b28; border-radius:7px; color:var(--text); padding-inline:9px; display:block; line-height:40px; text-overflow:ellipsis; white-space:nowrap; overflow:hidden; }
+.baseline-selected-name[hidden] { display:none; }
+.baseline-field select:disabled + .baseline-selected-name { color:var(--muted); }
+@media (forced-colors: active) {
+  .baseline-selected-name { background:Canvas; color:CanvasText; forced-color-adjust:none; }
+  .baseline-field select:disabled + .baseline-selected-name { color:GrayText; }
+}
