@@ -1564,9 +1564,9 @@ html { scroll-padding-bottom:calc(min(240px, 48dvh) + env(safe-area-inset-bottom
 .adaptive-actions label { display:grid; gap:5px; color:#c4d4df; font-size:.84rem; }
 .adaptive-actions select { min-height:44px; padding:7px 12px; border:1px solid var(--border-strong); border-radius:11px; }
 .mode-adaptive .chart-panel,.mode-adaptive .metric-panel > .metric-card:not(.stress-card),
-.mode-adaptive .stress-card > :not(.stress-baseline-picker):not(.baseline-note),
+.mode-adaptive .stress-card > :not(.stress-baseline-picker):not(.baseline-note):not(.adaptive-baseline-explainer),
 .mode-adaptive .controls-panel .session-action-area { display:none; }
-.mode-adaptive .metric-panel { display:flex; align-items:center; }
+.mode-adaptive .metric-panel { display:flex; align-items:flex-start; }
 .mode-adaptive .stress-card { width:100%; }
 .mode-adaptive:not(.adaptive-calibrating) .timer-panel { display:none; }
 .mode-adaptive:not(.adaptive-calibrating) .lower-controls { grid-column:1 / -1; }
@@ -1596,3 +1596,8 @@ html { scroll-padding-bottom:calc(min(240px, 48dvh) + env(safe-area-inset-bottom
 }
 
 .topbar:has(.language-menu:not([hidden])) { position:relative; z-index:32; }
+
+.adaptive-baseline-explainer { display:none; }
+.mode-adaptive .adaptive-baseline-explainer { order:3; display:block; border:1px solid var(--border); border-radius:var(--radius-sm); background:rgba(10,16,25,.52); padding:12px; }
+.adaptive-baseline-explainer h3 { font-size:.88rem; margin:0 0 5px; }
+.mode-adaptive .stress-baseline-picker { margin-top:0; padding-top:0; border-top:0; }

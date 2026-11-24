@@ -196,6 +196,10 @@
             <button id="cancelCalibrationButton" class="text-button" hidden data-i18n="baseline.cancel">Cancel calibration</button>
             <p class="control-note control-status" id="baselineActionStatus" role="status" aria-live="polite"></p>
           </div>
+          <aside class="adaptive-baseline-explainer" aria-labelledby="adaptiveBaselineAbout">
+            <h3 id="adaptiveBaselineAbout" data-i18n="dash.adaptiveAbout">About Adaptive sessions</h3>
+            <p class="control-note" data-i18n="dash.adaptiveAboutNote">Adaptive compares successive readings with your chosen baseline until you stop or the timer ends. The session summary stays in this browser, even when signed in; no raw recordings are saved.</p>
+          </aside>
           <button class="text-button assistant-explain" id="getMeasurementExplanation" type="button" hidden aria-controls="assistantPanel" data-i18n="assistant.getMore">Get to know more</button>
         </div>
       </section>
@@ -264,7 +268,15 @@
             <h3 data-i18n="history.stressSummary">Stress Summary</h3>
             <p class="control-note" data-i18n="history.calendarTeaser">Explore the scores from your saved captures.</p>
           </div>
-          <button class="action-button ghost compact-button" id="stressSummaryOpen" type="button" aria-haspopup="dialog" aria-controls="stressSummaryDialog" data-i18n="history.calendarOpen">View summary</button>
+          <div class="stress-preview">
+            <table class="stress-calendar" aria-labelledby="stressPreviewMonth">
+              <caption id="stressPreviewMonth"></caption>
+              <thead><tr id="stressPreviewWeekdays"></tr></thead>
+              <tbody id="stressPreviewDays"></tbody>
+            </table>
+            <p class="control-note" id="stressPreviewStatus"></p>
+          </div>
+          <button class="action-button ghost compact-button" id="stressSummaryOpen" type="button" aria-haspopup="dialog" aria-controls="stressSummaryDialog" data-i18n="history.calendarOpen">View detailed summary</button>
         </div>
       </section>
       <section class="panel history-panel" aria-labelledby="historyTitle">
@@ -282,10 +294,9 @@
           <button class="action-button ghost compact-button" id="historyRetry" type="button" hidden data-i18n="history.retry">Retry</button>
         </div>
         <button class="action-button ghost compact-button history-open" id="historyOpen" type="button" aria-haspopup="dialog" aria-controls="historyDialog" hidden data-i18n="history.open">View history</button>
-        <p class="history-storage-note control-note" data-i18n="history.storageNote">Captures stay in this browser on this device.</p>
+        <p class="history-storage-note control-note" id="historyStorageNote" data-i18n="history.storageNote">Captures stay in this browser on this device.</p>
         <details class="adaptive-archive" id="adaptiveArchive">
           <summary data-i18n="dash.adaptiveHistory">Adaptive sessions</summary>
-          <p class="control-note" data-i18n="dash.adaptiveHistoryNote">Adaptive estimates are saved only in this browser, even when signed in. Up to 50 sessions are kept. No raw recordings are saved. Not a medical assessment.</p>
           <p class="section-empty" id="adaptiveArchiveEmpty" hidden data-i18n="dash.adaptiveHistoryEmpty">No Adaptive sessions saved in this browser.</p>
           <p class="section-empty" id="adaptiveArchiveStatus" role="status" hidden data-i18n="dash.adaptiveHistoryUnavailable">Adaptive history is unavailable in this browser.</p>
           <ol id="adaptiveArchiveList" class="adaptive-archive-list" tabindex="0" aria-label="Adaptive sessions" data-i18n-aria-label="dash.adaptiveHistory"></ol>
@@ -370,19 +381,21 @@
         <li><i data-level="3" aria-hidden="true"></i>50–74</li>
         <li><i data-level="4" aria-hidden="true"></i>75–100</li>
       </ul>
+    </div>
+    <div class="stress-summary-side">
       <section class="stress-selected-day" id="stressSummaryDayCard" aria-labelledby="stressSummaryDay" hidden>
         <p class="stress-summary-kicker" data-i18n="history.calendarSelectedDay">Selected day</p>
         <h3 id="stressSummaryDay" aria-live="polite"></h3>
         <p class="control-note" id="stressSummaryDayNarrative" aria-live="polite"></p>
         <p class="control-note stress-day-next" id="stressSummaryDayNext"></p>
-        <details class="stress-summary-details" id="stressSummaryDayMetrics" hidden>
-          <summary data-i18n="history.calendarDayMetrics">Recorded scores</summary>
+        <section class="stress-summary-details" id="stressSummaryDayMetrics" aria-labelledby="stressSummaryDayScoresTitle" hidden>
+          <h4 id="stressSummaryDayScoresTitle" data-i18n="history.calendarDayMetrics">Recorded scores</h4>
           <p class="control-note" id="stressSummaryDayDetails"></p>
-        </details>
+          <ol class="stress-day-records" id="stressSummaryDayRecords"></ol>
+        </section>
       </section>
-    </div>
-    <details class="stress-summary-details" id="stressSummaryDetails">
-      <summary data-i18n="history.calendarDetails">Capture details</summary>
+      <section class="stress-summary-details" id="stressSummaryDetails" aria-labelledby="stressSummaryDetailsTitle">
+      <h3 id="stressSummaryDetailsTitle" data-i18n="history.calendarDetails">Capture details</h3>
       <p class="control-note" id="stressSummaryStatus" role="status"></p>
       <div class="stress-summary-facts">
         <section aria-labelledby="stressSummaryTimesTitle">
@@ -390,7 +403,8 @@
           <ul class="stress-time-bins" id="stressSummaryTimes"></ul>
         </section>
       </div>
-    </details>
+      </section>
+    </div>
   </div>
 </dialog>
 

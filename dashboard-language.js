@@ -1,5 +1,15 @@
 (() => {
   "use strict"
+  Object.assign(window.NEUROFRONT_TRANSLATIONS.en, {
+    "dash.adaptiveAbout": "About Adaptive sessions",
+    "dash.adaptiveAboutNote": "Adaptive compares successive readings with your chosen baseline until you stop or the timer ends. The session summary stays in this browser, even when signed in; no raw recordings are saved.",
+    "dash.baselinePreferenceFailed": "The baseline change was not saved. Try again."
+  })
+  Object.assign(window.NEUROFRONT_TRANSLATIONS.hi || {}, {
+    "dash.adaptiveAbout": "एडैप्टिव सत्रों के बारे में",
+    "dash.adaptiveAboutNote": "आपके रोकने या टाइमर के खत्म होने तक, एडैप्टिव लगातार रीडिंग की तुलना चुनी हुई बेसलाइन से करता है। सत्र का सारांश इसी ब्राउज़र में रहता है; मूल रिकॉर्डिंग सेव नहीं होती।",
+    "dash.baselinePreferenceFailed": "बेसलाइन का बदलाव सेव नहीं हुआ। फिर कोशिश करें।"
+  })
   const keys = ["mode","standard","adaptive","measurement","data","dock","reference","duration","five","ten","start","stop","elapsed","session","intro","privacy","ready","running","missing","cancelled","lost","invalid","completed","coverage","visibility","changed","contact","noScore"]
   const values = {
     en: ["Measurement mode","Standard","Adaptive","Measurement","Data","Dashboard navigation","Resting reference: 50/100","Session length","5 minutes","10 minutes","Start session","Stop session","Elapsed time","Adaptive session","Choose a length, select a baseline and connect your device. Recording starts only when you press Start session.","Recorded session estimate only. Not a medical assessment. Adaptive results stay on this screen and are not added to capture history.","Ready when you are.","Recording. Keep this tab visible and maintain electrode contact.","Select a baseline and connect with a fresh signal to start.","Stopped. The incomplete session was discarded.","Signal interrupted. No session estimate was produced.","Insufficient valid signal. No session estimate was produced.","Recorded session estimate: {score}/100","{count} complete 15-second windows · {minutes} minutes","Tab hidden. The incomplete session was discarded.","Session reset. No partial result was saved.","Keep both electrodes in contact.","No capture yet"],

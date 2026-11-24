@@ -4,10 +4,11 @@
   const PAGE_SIZE = 6
   const elements = Object.fromEntries([
     "historyList", "historyEmpty", "historyStatus", "historyRetry", "historyLoadMore",
-    "historyOpen", "historyClose", "historyDialog", "historyGroups", "historyDialogNotice",
+    "historyOpen", "historyClose", "historyDialog", "historyGroups", "historyDialogNotice", "historyStorageLabel",
     "stressSummaryDialog", "stressSummaryOpen", "stressSummaryClose", "stressSummaryPrevious", "stressSummaryNext",
+    "stressPreviewMonth", "stressPreviewWeekdays", "stressPreviewDays", "stressPreviewStatus", "historyStorageNote",
     "stressSummaryStatus", "stressSummaryMonth", "stressSummaryWeekdays", "stressSummaryDays", "stressSummaryDay",
-    "stressSummaryDayCard", "stressSummaryDayNarrative", "stressSummaryDayNext", "stressSummaryDayMetrics", "stressSummaryDayDetails", "stressSummaryTimes", "stressSummaryToday", "stressSummaryTodayNarrative", "stressSummaryDetails",
+    "stressSummaryDayCard", "stressSummaryDayNarrative", "stressSummaryDayNext", "stressSummaryDayMetrics", "stressSummaryDayDetails", "stressSummaryDayRecords", "stressSummaryTimes", "stressSummaryToday", "stressSummaryTodayNarrative", "stressSummaryDetails",
     "captureDialog", "captureClose", "captureDate", "captureScore", "captureCategory",
     "captureActivity", "captureAverage", "capturePeak", "captureMinimum", "captureDuration",
     "captureBaselineDate", "captureBaselineFeatures", "captureGraph", "captureBaselineGraph", "captureExport",
@@ -199,6 +200,7 @@
   let summaryDay = null
   let summaryToken = 0
   let summaryData = null
+  let previewToken = 0
 
   async function readGuestMonth(first, next) {
     const db = await openDatabase()
@@ -223,14 +225,14 @@
   }
 
   function renderSummaryDay(days) {
-    const { stressSummaryDayCard, stressSummaryDay, stressSummaryDayNarrative, stressSummaryDayNext, stressSummaryDayDetails, stressSummaryDayMetrics } = elements
+    const { stressSummaryDayCard, stressSummaryDay, stressSummaryDayNarrative, stressSummaryDayNext, stressSummaryDayDetails, stressSummaryDayMetrics, stressSummaryDayRecords } = elements
+    stressSummaryDayRecords.replaceChildren()
     stressSummaryDayCard.hidden = !summaryDay
     if (!summaryDay) {
       stressSummaryDay.textContent = ""
       stressSummaryDayNarrative.textContent = ""
       stressSummaryDayNext.textContent = ""
       stressSummaryDayDetails.textContent = ""
-      stressSummaryDayMetrics.open = false
       return
     }
     const date = new Date(summaryMonth.getFullYear(), summaryMonth.getMonth(), summaryDay)
@@ -252,6 +254,19 @@
     stressSummaryDayNext.textContent = t("history.calendarDayNextRepeat")
     stressSummaryDayDetails.textContent = statsText(stats) + ". " + t("history.calendarPeak", { score: peak })
       + (stats.count > 1 && low !== peak ? ". " + t("history.calendarDayLow", { score: low }) : "")
+    const formatter = new Intl.DateTimeFormat(document.documentElement.lang, { timeStyle: "short" })
+    const number = new Intl.NumberFormat(document.documentElement.lang, { maximumFractionDigits: 1 })
+    const list = (summaryData?.scores || []).filter(item => new Date(item.completedAt).toDateString() === date.toDateString())
+      .sort((a, b) => b.completedAt.localeCompare(a.completedAt))
+    stressSummaryDayRecords.replaceChildren(...list.map(item => {
+      const row = document.createElement("li")
+      const time = document.createElement("time"), score = document.createElement("strong")
+      time.dateTime = item.completedAt
+      time.textContent = formatter.format(new Date(item.completedAt))
+      score.textContent = number.format(item.score) + "/100"
+      row.append(time, score)
+      return row
+    }))
   }
 
   function renderSummaryToday(today, bins, { reading, unavailable, partial }) {
@@ -316,6 +331,8 @@
       header.textContent = weekdayShort.format(date)
       return header
     }))
+    if (!summaryDay && days.size) summaryDay = Math.max(...days.keys())
+    if (!summaryDay && summaryMonth.getTime() === monthOf(today).getTime() && !reading) summaryDay = today.getDate()
     const firstColumn = summaryMonth.getDay()
     const dayCount = new Date(summaryMonth.getFullYear(), summaryMonth.getMonth() + 1, 0).getDate()
     const rows = []
@@ -343,7 +360,6 @@
       button.setAttribute("aria-pressed", String(summaryDay === day))
       button.addEventListener("click", () => {
         summaryDay = day
-        elements.stressSummaryDayMetrics.open = false
         for (const sibling of stressSummaryDays.querySelectorAll("button")) sibling.setAttribute("aria-pressed", String(sibling === button))
         renderSummaryDay(days)
       })
@@ -370,15 +386,7 @@
     if (reset) { summaryData = null; renderSummary() }
     if (accountOwner) {
       if (account?.user?.id !== accountOwner) return
-      const saved = account.captures.filter(record => {
-        if (!record?.cloudSaved) return false
-        const time = Date.parse(record.completedAt)
-        return !Number.isFinite(time) || (time >= first.getTime() && time < next.getTime())
-      })
-      const valid = saved.filter(validCapture)
-      summaryData = { scores: valid.map(record => ({ completedAt: record.completedAt, score: record.stress.score })),
-        partial: Boolean(account.loading || account.error || account.conflict || saved.length !== valid.length),
-        unavailable: Boolean(account.error && !valid.length), reading: account.loading }
+      summaryData = summarizeAccountMonth(account, first, next)
     } else {
       let result
       try { result = await readGuestMonth(first, next) }
@@ -387,6 +395,81 @@
       summaryData = result
     }
     renderSummary()
+  }
+
+  function summarizeAccountMonth(account, first, next) {
+    const saved = account.captures.filter(record => {
+      if (!record?.cloudSaved) return false
+      const time = Date.parse(record.completedAt)
+      return !Number.isFinite(time) || (time >= first.getTime() && time < next.getTime())
+    })
+    const valid = saved.filter(validCapture)
+    return { scores: valid.map(record => ({ completedAt: record.completedAt, score: record.stress.score })),
+      partial: Boolean(account.loading || account.error || account.conflict || saved.length !== valid.length),
+      unavailable: Boolean(account.error && !valid.length), reading: account.loading }
+  }
+
+  function renderPreview(month, { scores = [], unavailable = false, partial = false, reading = false } = {}) {
+    const { stressPreviewMonth, stressPreviewWeekdays, stressPreviewDays, stressPreviewStatus } = elements
+    const locale = document.documentElement.lang
+    const weekday = new Intl.DateTimeFormat(locale, { weekday: "short" })
+    const number = new Intl.NumberFormat(locale)
+    const today = new Date()
+    const days = new Map()
+    for (const item of scores) {
+      const day = new Date(item.completedAt).getDate()
+      if (!days.has(day)) days.set(day, emptyStats())
+      addScore(days.get(day), item.score)
+    }
+    stressPreviewMonth.textContent = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(month)
+    stressPreviewWeekdays.replaceChildren(...Array.from({ length: 7 }, (_, i) => {
+      const th = document.createElement("th")
+      th.scope = "col"
+      th.textContent = weekday.format(new Date(2024, 0, 7 + i))
+      return th
+    }))
+    const rows = [], offset = month.getDay()
+    const last = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
+    for (let i = 0; i < Math.ceil((offset + last) / 7) * 7; i++) {
+      if (i % 7 === 0) rows.push(document.createElement("tr"))
+      const day = i - offset + 1
+      const td = document.createElement("td")
+      rows.at(-1).append(td)
+      if (day < 1 || day > last) continue
+      const stats = days.get(day)
+      const label = document.createElement("span")
+      label.className = "stress-calendar-day"
+      label.textContent = number.format(day)
+      if (day === today.getDate()) label.setAttribute("aria-current", "date")
+      if (stats || day <= today.getDate()) label.dataset.level = stats ? String(Math.min(4, Math.floor(averageOf(stats) / 25) + 1)) : "empty"
+      label.title = stats ? statsText(stats) : ""
+      if (stats) label.setAttribute("aria-label", label.textContent + ": " + label.title)
+      td.append(label)
+    }
+    stressPreviewDays.replaceChildren(...rows)
+    const total = emptyStats()
+    for (const item of scores) addScore(total, item.score)
+    stressPreviewStatus.textContent = unavailable ? t("history.summaryUnavailable") : reading && !total.count ? t("history.summaryLoading")
+      : t(total.count === 1 ? "history.summaryMonthOne" : total.count ? "history.summaryMonth" : "history.summaryEmptyMonth",
+        { score: averageOf(total), count: total.count }) + (partial ? " " + t("history.summaryPartial") : "")
+  }
+
+  async function refreshPreview(account) {
+    const token = ++previewToken, version = scopeVersion
+    const first = monthOf(new Date()), next = new Date(first.getFullYear(), first.getMonth() + 1, 1)
+    if (accountOwner) {
+      renderPreview(first, account?.user?.id === accountOwner ? summarizeAccountMonth(account, first, next) : { reading: true })
+      return
+    }
+    const auth = window.NeuroFrontAccount
+    if (auth?.owner?.() || auth?.sessionResolved?.() === false) {
+      renderPreview(first, { reading: true })
+      return
+    }
+    let result
+    try { result = await readGuestMonth(first, next) }
+    catch { result = { unavailable: true } }
+    if (token === previewToken && version === scopeVersion) renderPreview(first, result)
   }
 
   function changeSummaryMonth(offset) {
@@ -489,6 +572,7 @@
     elements.historyStatus.textContent = status ? t(status) : ""
     elements.historyDialogNotice.textContent = status ? t(status) : all.length ? "" : t("history.empty")
     refreshSummary(account)
+    refreshPreview(account)
     if (account?.pendingCaptureDeletes?.length) elements.historyRetry.hidden = false
     if ((focusedId || focusedDeleteId) && !elements.captureDialog.open && !elements.captureDeleteDialog.open) {
       [...activeHistoryList().querySelectorAll("button")].find(button => focusedDeleteId ? button.dataset.deleteCaptureId === focusedDeleteId : button.dataset.captureId === focusedId)?.focus({ preventScroll: true })
@@ -701,14 +785,13 @@
     summaryData = null
     elements.stressSummaryStatus.textContent = ""
     elements.stressSummaryTodayNarrative.textContent = ""
-    elements.stressSummaryDetails.open = false
     elements.stressSummaryDays.replaceChildren()
     elements.stressSummaryTimes.replaceChildren()
     elements.stressSummaryDay.textContent = ""
-    elements.stressSummaryDayMetrics.open = false
     elements.stressSummaryDayNarrative.textContent = ""
     elements.stressSummaryDayNext.textContent = ""
     elements.stressSummaryDayDetails.textContent = ""
+    elements.stressSummaryDayRecords.replaceChildren()
     elements.stressSummaryOpen.focus({ preventScroll: true })
   })
   elements.historyOpen.addEventListener("click", () => {
@@ -823,6 +906,7 @@
   }
   document.addEventListener("neurofront:accountreset", event => {
     scopeVersion++
+    renderPreview(monthOf(new Date()), { reading: true })
     accountOwner = event.detail.nextOwner
     elements.captureDeleteDialog.close()
     deleteTarget = null; deleteBusy = false; deleteFailed = false; historyNotice = ""
@@ -838,9 +922,12 @@
     if (event.detail.owner === accountOwner) loadPage(true)
   })
   document.addEventListener("neurofront:accountchange", () => {
-    const label = document.querySelector('[data-i18n="history.local"]')
-    if (label) window.NeuroFrontI18n.setMessage(label, accountOwner ? "account.history.cloud" : "history.local")
+    window.NeuroFrontI18n?.setMessage(elements.historyStorageLabel, accountOwner ? "account.history.cloud" : "history.local")
+    window.NeuroFrontI18n?.setMessage(elements.historyStorageNote, accountOwner ? "history.storageNoteAccount" : "history.storageNote")
     if (accountOwner) renderList()
+  })
+  document.addEventListener("neurofront:sessionresolved", () => {
+    if (!window.NeuroFrontAccount?.owner()) refreshPreview(null)
   })
   window.NeuroFrontHistory = Object.freeze({ record: recordCapture, getLatest: () => latestCapture && copy(latestCapture), readAssistantHistory, validCapture, readGuestCaptures })
   loadPage(true)

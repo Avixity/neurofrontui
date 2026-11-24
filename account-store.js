@@ -138,7 +138,7 @@
       window.NeuroFrontResources?.setExpanded(preferences.resourcesExpanded === true, false)
       const baselines = visibleBaselines(bucket)
       const active = baselines.find(row => row.id === bucket.profile?.active_baseline_id)
-      window.NeuroFrontDevice?.setSavedBaseline(active?.payload || null, baselines)
+      window.NeuroFrontDevice?.setSavedBaseline(active?.payload || null, baselines, active?.id || "")
     } finally { applying = false }
   }
   async function loadAvatar(id, generation) {

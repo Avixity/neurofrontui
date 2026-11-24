@@ -455,6 +455,7 @@ function loadSavedBaseline() {
     window.NeuroFrontI18n.setText(refs.baselineActionStatus, "Saved baselines are unavailable in this browser. You can still recalibrate.")
   }
   updateSavedBaselineInfo()
+  if (state.savedBaseline) selectBaselineRecord(state.savedBaseline, "saved")
 }
 
 function setBaselineTimer(seconds, progress, label, status) {
@@ -480,7 +481,6 @@ function updateAccountBaselineNotice() {
 function startCalibration() {
   if (!state.characteristic || !isDeviceConnected() || window.NeuroFrontAdaptive?.busy() || state.measurement.active || state.calibration.active) return
   baselineSaveNotice = null
-  state.selectedBaselineKey = ""
   state.calibration = { active: true, startTime: performance.now(), samples: [], holdTimer: false }
   state.flow = "calibrating"
   window.NeuroFrontAccount?.deviceBusy()
@@ -495,7 +495,7 @@ function cancelCalibration(message = "Calibration cancelled. Your previous basel
   state.calibration.active = false
   state.calibration.samples = []
   state.calibration.holdTimer = true
-  state.flow = "baseline"
+  state.flow = state.baseline.ready ? "ready" : "baseline"
   window.NeuroFrontAccount?.deviceBusy()
   refs.countdownCard.classList.remove("is-running")
   window.NeuroFrontI18n.setText(refs.baselineActionStatus, message)
@@ -542,6 +542,7 @@ function updateCalibration(now) {
     createdAt, samples, features
   }
   state.baseline = { ...features, samples: samples.slice(), ready: true, createdAt }
+  state.selectedBaselineKey = ""
   state.flow = "ready"
   state.calibration.active = false
   state.calibration.samples = []
@@ -789,6 +790,18 @@ function finalizeMeasurement() {
 function measureAgain() {
   baselineSaveNotice = null
   if (state.flow !== "complete" || state.measurement.active || state.calibration.active) return
+  if (state.savedBaseline && (!state.baseline.ready || state.baseline.createdAt !== state.savedBaseline.createdAt)) {
+    state.flow = "baseline"
+    const active = state.accountBaselines.find(row => row.payload === state.savedBaseline)
+    selectBaselineRecord(state.savedBaseline, active?.id || "saved")
+    return
+  }
+  if (state.baseline.ready) {
+    state.flow = "ready"
+    setBaselineTimer(MEASUREMENT_MS / 1000, 0, "Measurement Window", "Ready for 15 second capture")
+    updateControlsAvailability(performance.now())
+    return
+  }
   state.flow = "baseline"
   state.selectedBaselineKey = ""
   state.calibration.holdTimer = true
@@ -1353,13 +1366,26 @@ function bindEvents() {
     }
   })
   document.addEventListener("neurofront:accountchange", updateAccountBaselineNotice)
+  document.addEventListener("neurofront:sessionresolved", () => {
+    if (!window.NeuroFrontAccount?.owner()) loadSavedBaseline()
+  })
   refs.connectButton.addEventListener("click", connectBluetooth)
   refs.measureAgainButton.addEventListener("click", measureAgain)
   refs.exportButton.addEventListener("click", exportChartAsPng)
   refs.recalibrateButton.addEventListener("click", startCalibration)
-  refs.baselineSelect.addEventListener("change", () => {
+  refs.baselineSelect.addEventListener("change", async () => {
     const selectedKey = refs.baselineSelect.value
-    selectBaselineRecord(state.baselineOptions.get(selectedKey), selectedKey)
+    if (!window.NeuroFrontAccount?.owner() || selectedKey === "saved") {
+      selectBaselineRecord(state.baselineOptions.get(selectedKey), selectedKey)
+      return
+    }
+    const owner = window.NeuroFrontAccount.owner()
+    try { await window.NeuroFrontAccount.setActiveBaseline(selectedKey) }
+    catch {
+      if (window.NeuroFrontAccount.owner() !== owner) return
+      syncBaselinePicker()
+      window.NeuroFrontI18n.setMessage(refs.baselineActionStatus, "dash.baselinePreferenceFailed")
+    }
   })
   refs.cancelCalibrationButton.addEventListener("click", () => cancelCalibration())
   document.addEventListener("neurofront:languagechange", () => {
@@ -1369,7 +1395,12 @@ function bindEvents() {
 }
 
 function init() {
-  loadSavedBaseline()
+  updateSavedBaselineInfo()
+  // A known guest can restore offline; a returning account waits for owner hydration.
+  try {
+    const url = new URL(window.location.href)
+    if (localStorage.getItem("neurofront.auth") === null && !url.searchParams.has("code") && !url.hash.includes("access_token=")) loadSavedBaseline()
+  } catch { /* Wait for explicit session resolution if ownership cannot be determined. */ }
   refs.countdownRing.style.strokeDasharray = `${RING_CIRCUMFERENCE}`
   refs.countdownRing.style.strokeDashoffset = "0"
   initChart()
@@ -1389,13 +1420,14 @@ window.NeuroFrontDevice = Object.freeze({
   busy: () => state.calibration.active || state.measurement.active || Boolean(window.NeuroFrontAdaptive?.busy()),
   validBaseline: validateSavedBaseline,
   loadGuestBaseline: loadSavedBaseline,
-  setSavedBaseline(record, accountBaselines = []) {
+  setSavedBaseline(record, accountBaselines = [], activeKey = "") {
     state.savedBaseline = validateSavedBaseline(record) ? record : null
     state.accountBaselines = accountBaselines.filter(row => typeof row?.id === "string" && validateSavedBaseline(row.payload))
-    const explicitBaseline = state.selectedBaselineKey && state.accountBaselines.find(row => row.id === state.selectedBaselineKey)
-    const removedSelection = state.selectedBaselineKey && state.selectedBaselineKey !== "saved" && !explicitBaseline
-    if (!state.measurement.active && !state.calibration.active && state.baseline.ready &&
-        (removedSelection || state.baseline.createdAt !== (explicitBaseline?.payload || state.savedBaseline)?.createdAt)) {
+    const active = state.accountBaselines.find(row => row.id === activeKey)
+    const blocked = state.measurement.active || state.calibration.active || window.NeuroFrontAdaptive?.busy()
+    if (!blocked && state.baseline.ready &&
+        (state.selectedBaselineKey && state.selectedBaselineKey !== active?.id ||
+          state.baseline.createdAt !== state.savedBaseline?.createdAt)) {
       window.NeuroFrontAdaptive?.cancel("discardBaseline")
       state.selectedBaselineKey = ""
       state.baseline.ready = false
@@ -1403,6 +1435,11 @@ window.NeuroFrontDevice = Object.freeze({
       window.NeuroFrontI18n.setMessage(refs.baselineActionStatus, "account.chooseBaseline")
     }
     updateSavedBaselineInfo()
+    if (!blocked && active && (!state.baseline.ready || state.flow === "baseline")) {
+      selectBaselineRecord(active.payload, active.id)
+    } else if (!blocked && active && state.baseline.createdAt === active.payload.createdAt) {
+      state.selectedBaselineKey = active.id
+    }
     updateControlsAvailability(performance.now())
   },
   guestBaseline() {

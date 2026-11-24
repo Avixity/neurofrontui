@@ -5,7 +5,8 @@
       "history.open": "View history",
       "history.stressSummary": "Stress Summary",
       "history.calendarTeaser": "Explore the scores from your saved captures.",
-      "history.calendarOpen": "View summary",
+      "history.calendarOpen": "View detailed summary",
+      "history.storageNoteAccount": "Standard captures sync to your account.",
       "history.calendarNote": "Scores are from saved captures only, not continuous stress readings. Times are local.",
       "history.calendarDetails": "Capture details",
       "history.calendarStandard": "Standard captures",
@@ -529,6 +530,7 @@
       "حذف کرنا باقی ہے۔ آپ کے آن لائن ہونے پر یہ سنک ہو جائے گا۔", "ریکارڈنگ حذف ہو گئی", "{date} کی ریکارڈنگ"
     ]
   }
+  additions.hi["history.storageNoteAccount"] = "मानक कैप्चर आपके खाते में सिंक होते हैं।"
   const calendarKeys = ["calendarTeaser","calendarOpen","calendarNote","calendarPrevious","calendarNext","calendarLegend","calendarTimes","calendarMorning","calendarAfternoon","calendarEvening","calendarNight","calendarNoCapture","calendarNoCaptureDay","calendarNoLoaded","calendarNoLoadedDay","calendarDay","calendarDayOne","calendarPeak","calendarChooseDay","summaryLoading","summaryUnavailable","summaryPartial","summaryEmptyMonth","summaryMonth","summaryMonthOne"]
   const calendarLabels = {
     hi: ["अपने सहेजे गए मापों के स्कोर देखें।","सारांश देखें","स्कोर केवल सहेजे गए मापों से हैं, लगातार तनाव मापने से नहीं। समय स्थानीय है।","पिछला महीना","अगला महीना","दैनिक औसत स्कोर की कुंजी","दिन का समय · इस महीने","सुबह","दोपहर","शाम","रात","कोई माप नहीं","इस दिन का कोई सहेजा गया माप नहीं है।","कोई लोड किया गया माप नहीं","इस दिन का कोई माप लोड नहीं हुआ।","{score}/100 औसत · {count} माप","{score}/100 औसत · 1 माप","सबसे अधिक दर्ज स्कोर: {score}/100","दिन चुनें","सहेजे गए माप लोड हो रहे हैं…","इस महीने के सहेजे गए माप पढ़े नहीं जा सके।","हो सकता है कुछ सहेजे गए माप शामिल न हों।","इस महीने कोई सहेजा गया माप नहीं है।","{count} सहेजे गए मापों का औसत {score}/100।","1 सहेजे गए माप का औसत {score}/100।"],
